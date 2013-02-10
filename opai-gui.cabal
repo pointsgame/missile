@@ -1,0 +1,40 @@
+name:           opai-gui
+version:        2013.2.10
+cabal-version:  >= 1.2
+build-type:     Simple
+author:         kurnevsky
+license:        GPL-3
+
+executable opai-gui
+  hs-source-dirs:  src
+  main-is:         Main.hs
+  build-depends:   
+                   base >= 4,
+                   array,
+                   containers,
+                   OpenGL,
+                   colour,
+                   ConfigFile,
+                   MissingH,
+                   directory,
+                   gtk,
+                   gtkglext,
+                   transformers,
+                   glade,
+                   bytestring,
+                   utf8-string,
+                   strict,
+                   encoding,
+                   process,
+                   split,
+                   StateVar
+  ghc-options:     -Wall -fno-warn-unused-do-bind -O2 -threaded
+  other-modules:   
+                   Field,
+                   Settings,
+                   Game,
+                   FileFormats.Vkontakte,
+                   Auxiliary,
+                   Bot,
+                   FileFormats.Common,
+                   GameWithBot

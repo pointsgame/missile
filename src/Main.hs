@@ -270,6 +270,12 @@ getGameTab = do builder <- GtkBuilder.builderNew
                 return GameTab { tabTable = curTabTable,
                                  canvasTable = curCanvasTable }
 
+getAboutDialog :: IO Gtk.AboutDialog
+getAboutDialog = do builder <- GtkBuilder.builderNew
+                    GtkBuilder.builderAddFromFile builder "interface/about.glade"
+                    curAboutDialog <- GtkBuilder.builderGetObject builder Gtk.castToAboutDialog "aboutDialog"
+                    return curAboutDialog
+
 data MainWindow = MainWindow { mainWindow :: Gtk.Window,
                                mainNotebook :: Gtk.Notebook,
                                exitMenuItem :: Gtk.ImageMenuItem,
@@ -278,7 +284,8 @@ data MainWindow = MainWindow { mainWindow :: Gtk.Window,
                                saveMenuItem :: Gtk.ImageMenuItem,
                                closeMenuItem :: Gtk.ImageMenuItem,
                                undoMenuItem :: Gtk.ImageMenuItem,
-                               settingsMenuItem :: Gtk.ImageMenuItem }
+                               settingsMenuItem :: Gtk.ImageMenuItem,
+                               aboutMenuItem :: Gtk.ImageMenuItem }
 
 getMainWindow :: IO MainWindow
 getMainWindow = do builder <- GtkBuilder.builderNew
@@ -292,6 +299,7 @@ getMainWindow = do builder <- GtkBuilder.builderNew
                    curCloseMenuItem <- GtkBuilder.builderGetObject builder Gtk.castToImageMenuItem "closeMenuItem"
                    curUndoMenuItem <- GtkBuilder.builderGetObject builder Gtk.castToImageMenuItem "undoMenuItem"
                    curSettingsMenuItem <- GtkBuilder.builderGetObject builder Gtk.castToImageMenuItem "settingsMenuItem"
+                   curAboutMenuItem <- GtkBuilder.builderGetObject builder Gtk.castToImageMenuItem "aboutMenuItem"
                    return MainWindow { mainWindow = curWindow,
                                        mainNotebook = curMainNotebook,
                                        exitMenuItem = curExitMenuItem,
@@ -300,7 +308,8 @@ getMainWindow = do builder <- GtkBuilder.builderNew
                                        saveMenuItem = curSaveMenuItem,
                                        closeMenuItem = curCloseMenuItem,
                                        undoMenuItem = curUndoMenuItem,
-                                       settingsMenuItem = curSettingsMenuItem }
+                                       settingsMenuItem = curSettingsMenuItem,
+                                       aboutMenuItem = curAboutMenuItem }
 
 data SettingsWindow = SettingsWindow { settingsDialog :: Gtk.Dialog,
                                        fieldWidthSpinButton :: Gtk.SpinButton,
@@ -594,6 +603,11 @@ main = do Gtk.initGUI
                                                        Nothing       -> return ()
                             _                  -> error "fileChooser: uncknown response."
                   else return ()
+                return False
+          (aboutMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+                curAboutDialog <- getAboutDialog
+                Gtk.dialogRun curAboutDialog
+                Gtk.widgetDestroy curAboutDialog
                 return False
           Gtk.widgetShowAll (mainWindow window)
           Gtk.mainGUI

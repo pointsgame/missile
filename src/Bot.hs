@@ -25,11 +25,7 @@ run path = do (inp, out, err, pid) <- runInteractiveProcess path [] Nothing Noth
                            processId = pid }
 
 quit :: Bot -> IO ()
-quit bot =
-    do hPutStrLn (stdInput bot) "0 quit"
-       --waitResult <- hWaitForInput (stdOutput bot) 200
-       "= 0 quit" <- hGetLine (stdOutput bot)
-       return ()
+quit bot = hPutStrLn (stdInput bot) "0 quit"
 
 listCommands :: Bot -> IO [String]
 listCommands bot =

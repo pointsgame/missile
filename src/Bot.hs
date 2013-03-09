@@ -112,7 +112,7 @@ safeQuit bot =
                                 case maybeExitCode of
                                   Nothing -> terminateProcess (processId bot)
                                   Just _  -> return ()
-                void $ getProcessExitCode (processId bot)
+                void $ waitForProcess (processId bot)
 
 safeListCommands :: Bot -> IO () -> ([String] -> IO ()) -> IO ThreadId
 safeListCommands bot callbackError callback =

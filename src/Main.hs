@@ -513,7 +513,7 @@ main = do Gtk.initGUI
                 globalSettings <- get globalSettingsRef
                 curSettingsDialog <- createSettingsWindow globalSettings $ \settings ->
                     gameWithBot (emptyGame settings) (Gtk.postGUIAsync $ botErrorAlert $ emptyGame settings) >>= createGameTab
-                Gtk.widgetShowAll curSettingsDialog
+                Gtk.dialogRun curSettingsDialog
                 return False
           (closeMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
                 pageNum <- Gtk.notebookGetCurrentPage (mainNotebook window)
@@ -546,11 +546,11 @@ main = do Gtk.initGUI
                                 game' <- get (gwbGame gwb)
                                 modifyIORef tabsRef $ IntMap.insert pageNum gwb { gwbBotError = botErrorAlert game' }
                                 return ()
-                          Gtk.widgetShowAll curSettingsDialog
+                          Gtk.dialogRun curSettingsDialog
                   else do globalSettings <- get globalSettingsRef
                           curSettingsDialog <- createSettingsWindow globalSettings $ \settings -> do
                                 globalSettingsRef $= settings
-                          Gtk.widgetShowAll curSettingsDialog
+                          Gtk.dialogRun curSettingsDialog
                 return False
           (openMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
                 fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mainWindow window)) Gtk.FileChooserActionOpen [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]

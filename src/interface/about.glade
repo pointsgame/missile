@@ -8,7 +8,7 @@
     <property name="icon">Logo.png</property>
     <property name="type_hint">dialog</property>
     <property name="program_name">OPAI-GUI</property>
-    <property name="version">2013.2.10</property>
+    <property name="version">2013.3.10</property>
     <property name="copyright" translatable="yes">Author: Kurnevsky Evgeny</property>
     <property name="comments" translatable="yes">Open Points Artificial Intelligence</property>
     <property name="website">https://gitorious.org/opai</property>

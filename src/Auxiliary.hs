@@ -34,6 +34,4 @@ padRight c n s = if length s >= n
 
 toTreeInv :: [a] -> Tree a
 toTreeInv [] = error "toTreeInv: empty list."
-toTreeInv (h:t) = toTreeInv' t (Node h [])
-    where toTreeInv' [] tree = tree
-          toTreeInv' (h':t') tree = toTreeInv' t' (Node h' [tree])
+toTreeInv (h : t) = foldl (\tree h' -> Node h' [tree]) (Node h []) t

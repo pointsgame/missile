@@ -16,7 +16,7 @@ load :: String -> Settings -> IO (Maybe Game)
 load name settings =
         do fileEither <- try (BS.readFile name) :: IO (Either SomeException BS.ByteString)
            case fileEither of
-             Left ex  -> do putStrLn $ show ex
+             Left ex  -> do print ex
                             return Nothing
              Right bs -> return $ load' bs settings
 
@@ -37,13 +37,11 @@ load' byteString settings =
           fields = load'' (BS.drop 58 byteString) [emptyField 39 32]
           load'' bs fields' | BS.length bs < 4 = fields'
                             | otherwise = let pos = (fromIntegral $ BS.head bs, fromIntegral $ BS.index bs 1)
-                                              player = if BS.index bs 3 == 0x00
-                                                       then Just Black
-                                                       else if BS.index bs 3 == 0xFF
-                                                       then Just Red
-                                                       else Nothing
+                                              player | BS.index bs 3 == 0x00 = Just Black
+                                                     | BS.index bs 3 == 0xFF = Just Red
+                                                     | otherwise = Nothing
                                               nextFields = putPoint pos (fromJust player) (head fields') : fields'
-                                          in if (puttingAllow (head fields') pos) && (not $ isNothing player)
+                                          in if puttingAllow (head fields') pos && isJust player
                                              then load'' (BS.drop 13 bs) nextFields
                                              else fields'
 
@@ -53,7 +51,7 @@ save name game = let bs = save' game
                     then return False
                     else do fileEither <- try (BS.writeFile name bs) :: IO (Either SomeException ())
                             case fileEither of
-                              Left ex -> do putStrLn $ show ex
+                              Left ex -> do print ex
                                             return False
                               Right _ -> return True
 
@@ -76,8 +74,8 @@ save' game = if gameWidth settings /= 39 || gameHeight settings /= 32 || gameIsE
                        0x00 : 0x00 : -- ?
                        0x00 : 0x00 : -- ?
                        0x00 : 0x00 : -- ?
-                       (reverse $ BS.unpack $ encodeStrictByteString CP1251 $ padRight ' ' 9 $ take 9 $ blackName settings) ++ --Black name
-                       (reverse $ BS.unpack $ encodeStrictByteString CP1251 $ padRight ' ' 9 $ take 9 $ redName settings) ++ --Red name
+                       reverse (BS.unpack $ encodeStrictByteString CP1251 $ padRight ' ' 9 $ take 9 $ blackName settings) ++ --Black name
+                       reverse (BS.unpack $ encodeStrictByteString CP1251 $ padRight ' ' 9 $ take 9 $ redName settings) ++ --Red name
                        0x00 : 0x00 : -- ?
                        0x00 : 0x00 : -- ?
                        0x00 : 0x00 : -- ?
@@ -95,6 +93,6 @@ save' game = if gameWidth settings /= 39 || gameHeight settings /= 32 || gameIsE
                        0x00 : 0x00 : -- ?
                        (if player == Red then 0xFF else 0x00) : (if player == Red then 0xFF else 0x00) : --Last player.
                        0x01 :
-                       (fromIntegral y) : --y
-                       (fromIntegral x) : --x
+                       fromIntegral y : --y
+                       fromIntegral x : --x
                        str

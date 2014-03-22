@@ -7,6 +7,7 @@ import Control.Monad
 import Data.List.Split
 import Control.Concurrent
 import Control.Exception
+import Player
 import Field
 
 data Bot = Bot { stdInput :: Handle,

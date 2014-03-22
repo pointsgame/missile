@@ -1,6 +1,7 @@
 module FileFormats.Common where
 
 import Data.Tree
+import Player
 import Field
 import Game
 

@@ -3,6 +3,7 @@ module Game where
 import Data.Maybe
 import Data.List
 import Data.Tree
+import Player
 import Field
 import Settings
 import Auxiliary

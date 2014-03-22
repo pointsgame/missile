@@ -12,6 +12,7 @@ import Data.Colour.SRGB as SRGB
 import qualified Data.IntMap as IntMap
 import Codec.Binary.UTF8.String
 import Data.Maybe
+import Player
 import Field
 import Settings
 import Game
@@ -118,7 +119,7 @@ display game =
            --Rendering points.
            --First way.
            --mapM_ (renderPrimitive Polygon) $ map (\((x, y), player) -> do
-           --     color $ if player == Field.Red then redColor3 else blackColor3
+           --     color $ if player == Player.Red then redColor3 else blackColor3
            --     makeVertex $ ellipse (fromPosX' x, fromPosY' y)
            --                          ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldWidth headField) * 0.4)
            --                          ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldHeight headField) * 0.4)
@@ -127,20 +128,20 @@ display game =
            --pointSmooth $= Enabled
            --pointSize $= 20
            --mapM_ (renderPrimitive Points) $ map (\((x, y), player) -> do
-           --     color $ if player == Field.Red then redColor3 else blackColor3
+           --     color $ if player == Player.Red then redColor3 else blackColor3
            --     makeVertex [(fromPosX' x, fromPosY' y)]) $ moves headField
            --pointSmooth $= Disabled
            --Third way.
            lineWidth $= 2
            lineSmooth $= Enabled
            mapM_ (renderPrimitive Polygon) $ map (\((x, y), player) -> do
-                color $ if player == Field.Red then redColor3 else blackColor3
+                color $ if player == Player.Red then redColor3 else blackColor3
                 makeVertex $ ellipse (fromPosX' x, fromPosY' y)
                                      ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldWidth headField) * 0.3)
                                      ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldHeight headField) * 0.3)
                                      (pointDetailling settings)) $ moves headField
            renderPrimitive Lines $ mapM_ (\((x, y), player) -> do
-                   color $ if player == Field.Red then redColor3 else blackColor3
+                   color $ if player == Player.Red then redColor3 else blackColor3
                    let ellipsePoints = ellipse (fromPosX' x, fromPosY' y)
                                                ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldWidth headField) * 0.3)
                                                ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldHeight headField) * 0.3)
@@ -149,7 +150,7 @@ display game =
            --Rendering last point.
            if not $ null $ moves headField
              then renderPrimitive Lines $ (\((x, y), player) -> do
-                   color $ if player == Field.Red then redColor3 else blackColor3
+                   color $ if player == Player.Red then redColor3 else blackColor3
                    let ellipsePoints = ellipse (fromPosX' x, fromPosY' y)
                                                ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldWidth headField) * 0.6)
                                                ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldHeight headField) * 0.6)
@@ -160,7 +161,7 @@ display game =
            --Rendering little surrounds.
            if fullFill settings
              then mapM_ (\(field, (pos, player)) -> do
-                               currentColor $= if player == Field.Red then redColor4 else blackColor4
+                               currentColor $= if player == Player.Red then redColor4 else blackColor4
                                if playersPoint field (s pos) player && playersPoint field (e pos) player
                                  then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ s pos, fromPos' $ e pos]
                                  else do if playersPoint field (s pos) player && playersPoint field (se pos) player
@@ -196,7 +197,7 @@ display game =
                                ) $ zip (reverse fields) (map (head . moves) $ tail $ reverse fields)
              else return ()
            --Rendering surrounds.
-           mapM_ (\(chain, player) -> do currentColor $= if player == Field.Red then redColor4 else blackColor4
+           mapM_ (\(chain, player) -> do currentColor $= if player == Player.Red then redColor4 else blackColor4
                                          nonConvexPoligon $ map (\(x, y) -> Vertex2 (fromPosX settings cellWidth x) (fromPosY settings cellHeight y)) chain
                                          ) $ filter (not . null . fst) $ map lastSurroundChain $ reverse fields
 

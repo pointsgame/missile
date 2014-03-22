@@ -5,6 +5,7 @@ import qualified Data.ByteString as BS
 import Control.Exception
 import Data.Encoding
 import Data.Encoding.CP1251
+import Player
 import Field
 import Settings
 import Game

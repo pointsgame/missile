@@ -5,6 +5,7 @@ import Control.Monad
 import Data.StateVar
 import Data.Maybe
 import Settings
+import Player
 import Field
 import Game
 import Bot

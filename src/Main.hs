@@ -4,6 +4,7 @@ import qualified Graphics.UI.Gtk as Gtk
 --import Graphics.UI.Gtk (AttrOp((:=)))
 import qualified Graphics.UI.Gtk.OpenGL as GtkGL
 import qualified Graphics.UI.Gtk.Builder as GtkBuilder
+import Control.Monad
 import Control.Monad.IO.Class
 import Data.IORef
 import Graphics.Rendering.OpenGL as GL
@@ -48,8 +49,8 @@ fromPos :: Settings -> GLfloat -> GLfloat -> Pos -> (GLfloat, GLfloat)
 fromPos settings cellWidth cellHeight (x, y) = (fromPosX settings cellWidth x, fromPosY settings cellHeight y)
 
 toPos :: (RealFrac a) => Settings -> a -> a -> a -> a -> Pos
-toPos settings cellWidth cellHeight x y = let posX = round $ x / cellWidth - 0.5
-                                              posY = round $ y / cellHeight - 0.5
+toPos settings cellWidth cellHeight x y = let posX = floor $ x / cellWidth
+                                              posY = floor $ y / cellHeight
                                               posX' = if horizontalReflection settings
                                                       then gameWidth settings - posX - 1
                                                       else posX
@@ -115,7 +116,7 @@ display game =
            --Rendering grig.
            lineWidth $= fromIntegral (gridThickness settings)
            currentColor $= rgbToColor4 (gridColor settings) 1
-           renderPrimitive Lines $ makeVertex $ concat $ (verticalLines ++ horizontalLines)
+           renderPrimitive Lines $ makeVertex $ concat (verticalLines ++ horizontalLines)
            --Rendering points.
            --First way.
            --mapM_ (renderPrimitive Polygon) $ map (\((x, y), player) -> do
@@ -134,68 +135,58 @@ display game =
            --Third way.
            lineWidth $= 2
            lineSmooth $= Enabled
-           mapM_ (renderPrimitive Polygon) $ map (\((x, y), player) -> do
+           mapM_ (renderPrimitive Polygon . (\((x, y), player) -> do
                 color $ if player == Player.Red then redColor3 else blackColor3
                 makeVertex $ ellipse (fromPosX' x, fromPosY' y)
-                                     ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldWidth headField) * 0.3)
-                                     ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldHeight headField) * 0.3)
-                                     (pointDetailling settings)) $ moves headField
+                                     (realToFrac (pointRadius settings) / fromIntegral (fieldWidth headField) * 0.3)
+                                     (realToFrac (pointRadius settings) / fromIntegral (fieldHeight headField) * 0.3)
+                                     (pointDetailling settings))) $ moves headField
            renderPrimitive Lines $ mapM_ (\((x, y), player) -> do
                    color $ if player == Player.Red then redColor3 else blackColor3
                    let ellipsePoints = ellipse (fromPosX' x, fromPosY' y)
-                                               ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldWidth headField) * 0.3)
-                                               ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldHeight headField) * 0.3)
+                                               (realToFrac (pointRadius settings) / fromIntegral (fieldWidth headField) * 0.3)
+                                               (realToFrac (pointRadius settings) / fromIntegral (fieldHeight headField) * 0.3)
                                                (pointDetailling settings)
                    makeVertex $ foldl (\acc (a, b) -> a : b : acc) [] $ zip ellipsePoints $ leftShift1 ellipsePoints) $ moves headField
            --Rendering last point.
-           if not $ null $ moves headField
-             then renderPrimitive Lines $ (\((x, y), player) -> do
-                   color $ if player == Player.Red then redColor3 else blackColor3
-                   let ellipsePoints = ellipse (fromPosX' x, fromPosY' y)
-                                               ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldWidth headField) * 0.6)
-                                               ((realToFrac $ pointRadius settings) / (fromIntegral $ fieldHeight headField) * 0.6)
-                                               (pointDetailling settings)
-                   makeVertex $ foldl (\acc (a, b) -> a : b : acc) [] $ zip ellipsePoints $ leftShift1 ellipsePoints) $ head $ moves headField
-             else return ()
+           unless (null $ moves headField) $
+             renderPrimitive Lines $ (\((x, y), player) -> do
+               color $ if player == Player.Red then redColor3 else blackColor3
+               let ellipsePoints = ellipse (fromPosX' x, fromPosY' y)
+                                           (realToFrac (pointRadius settings) / fromIntegral (fieldWidth headField) * 0.6)
+                                           (realToFrac (pointRadius settings) / fromIntegral (fieldHeight headField) * 0.6)
+                                           (pointDetailling settings)
+               makeVertex $ foldl (\acc (a, b) -> a : b : acc) [] $ zip ellipsePoints $ leftShift1 ellipsePoints) $ head $ moves headField
            lineSmooth $= Disabled
            --Rendering little surrounds.
-           if fullFill settings
-             then mapM_ (\(field, (pos, player)) -> do
+           when (fullFill settings) $
+             mapM_ (\(field, (pos, player)) -> do
                                currentColor $= if player == Player.Red then redColor4 else blackColor4
                                if playersPoint field (s pos) player && playersPoint field (e pos) player
                                  then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ s pos, fromPos' $ e pos]
-                                 else do if playersPoint field (s pos) player && playersPoint field (se pos) player
-                                           then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ s pos, fromPos' $ se pos]
-                                           else return ()
-                                         if playersPoint field (e pos) player && playersPoint field (se pos) player
-                                           then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ e pos, fromPos' $ se pos]
-                                           else return ()
+                                 else do when (playersPoint field (s pos) player && playersPoint field (se pos) player) $
+                                           renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ s pos, fromPos' $ se pos]
+                                         when (playersPoint field (e pos) player && playersPoint field (se pos) player) $
+                                           renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ e pos, fromPos' $ se pos]
                                if playersPoint field (e pos) player && playersPoint field (n pos) player
                                  then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ e pos, fromPos' $ n pos]
-                                 else do if playersPoint field (e pos) player && playersPoint field (ne pos) player
-                                           then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ e pos, fromPos' $ ne pos]
-                                           else return ()
-                                         if playersPoint field (n pos) player && playersPoint field (ne pos) player
-                                           then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ n pos, fromPos' $ ne pos]
-                                           else return ()
+                                 else do when (playersPoint field (e pos) player && playersPoint field (ne pos) player) $
+                                           renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ e pos, fromPos' $ ne pos]
+                                         when (playersPoint field (n pos) player && playersPoint field (ne pos) player) $
+                                           renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ n pos, fromPos' $ ne pos]
                                if playersPoint field (n pos) player && playersPoint field (w pos) player
                                  then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ n pos, fromPos' $ w pos]
-                                 else do if playersPoint field (n pos) player && playersPoint field (nw pos) player
-                                           then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ n pos, fromPos' $ nw pos]
-                                           else return ()
-                                         if playersPoint field (w pos) player && playersPoint field (nw pos) player
-                                           then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ w pos, fromPos' $ nw pos]
-                                           else return ()
+                                 else do when (playersPoint field (n pos) player && playersPoint field (nw pos) player) $
+                                           renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ n pos, fromPos' $ nw pos]
+                                         when (playersPoint field (w pos) player && playersPoint field (nw pos) player) $
+                                           renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ w pos, fromPos' $ nw pos]
                                if playersPoint field (w pos) player && playersPoint field (s pos) player
                                  then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ w pos, fromPos' $ s pos]
-                                 else do if playersPoint field (w pos) player && playersPoint field (sw pos) player
-                                           then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ w pos, fromPos' $ sw pos]
-                                           else return ()
-                                         if playersPoint field (s pos) player && playersPoint field (sw pos) player
-                                           then renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ s pos, fromPos' $ sw pos]
-                                           else return ()
+                                 else do when (playersPoint field (w pos) player && playersPoint field (sw pos) player) $
+                                           renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ w pos, fromPos' $ sw pos]
+                                         when (playersPoint field (s pos) player && playersPoint field (sw pos) player) $
+                                           renderPrimitive Polygon $ makeVertex [fromPos' pos, fromPos' $ s pos, fromPos' $ sw pos]
                                ) $ zip (reverse fields) (map (head . moves) $ tail $ reverse fields)
-             else return ()
            --Rendering surrounds.
            mapM_ (\(chain, player) -> do currentColor $= if player == Player.Red then redColor4 else blackColor4
                                          nonConvexPoligon $ map (\(x, y) -> Vertex2 (fromPosX settings cellWidth x) (fromPosY settings cellHeight y)) chain
@@ -251,8 +242,8 @@ connectCanvas canvas gwb =
                                 height' = min height ((width * gameFieldHeight) `div` gameFieldWidth)
                                 cellWidth = fromIntegral width' / fromIntegral gameFieldWidth
                                 cellHeight = fromIntegral height' / fromIntegral gameFieldHeight
-                                x' = x - (fromIntegral $ (width - width') `div` 2)
-                                y' = (fromIntegral height') - (y - (fromIntegral $ (height - height') `div` 2))
+                                x' = x - fromIntegral ((width - width') `div` 2)
+                                y' = fromIntegral height' - (y - fromIntegral ((height - height') `div` 2))
                                 pos = toPos (gameSettings game) cellWidth cellHeight x' y'
                             putGWBPoint pos gwb
            return ()
@@ -274,8 +265,7 @@ getGameTab = do builder <- GtkBuilder.builderNew
 getAboutDialog :: IO Gtk.AboutDialog
 getAboutDialog = do builder <- GtkBuilder.builderNew
                     GtkBuilder.builderAddFromFile builder "interface/about.glade"
-                    curAboutDialog <- GtkBuilder.builderGetObject builder Gtk.castToAboutDialog "aboutDialog"
-                    return curAboutDialog
+                    GtkBuilder.builderGetObject builder Gtk.castToAboutDialog "aboutDialog"
 
 data MainWindow = MainWindow { mainWindow :: Gtk.Window,
                                mainNotebook :: Gtk.Notebook,
@@ -392,26 +382,26 @@ getSettingsWindow = do builder <- GtkBuilder.builderNew
 createSettingsWindow :: Settings -> (Settings -> IO ()) -> IO Gtk.Dialog
 createSettingsWindow startSettings f =
     do settingsWindow <- getSettingsWindow
-       let getSettings = do curGameWidth <- Gtk.get (fieldWidthSpinButton settingsWindow) Gtk.spinButtonValue >>= return . round
-                            curGameHeight <- Gtk.get (fieldHeightSpinButton settingsWindow) Gtk.spinButtonValue >>= return . round
-                            curGameName <- Gtk.entryGetText (gameNameEntry settingsWindow) >>= return . trim
-                            curRedName <- Gtk.entryGetText (redNameEntry settingsWindow) >>= return . trim
-                            curBlackName <- Gtk.entryGetText (blackNameEntry settingsWindow) >>= return . trim
-                            curRedColor <- Gtk.colorButtonGetColor (redColorButton settingsWindow) >>= return . gtkColorToRgb
-                            curBlackColor <- Gtk.colorButtonGetColor (blackColorButton settingsWindow) >>= return . gtkColorToRgb
-                            curBackgroundColor <- Gtk.colorButtonGetColor (backgroundColorButton settingsWindow) >>= return . gtkColorToRgb
+       let getSettings = do curGameWidth <- liftM round $ Gtk.get (fieldWidthSpinButton settingsWindow) Gtk.spinButtonValue
+                            curGameHeight <- liftM round $ Gtk.get (fieldHeightSpinButton settingsWindow) Gtk.spinButtonValue
+                            curGameName <- liftM trim $ Gtk.entryGetText $ gameNameEntry settingsWindow
+                            curRedName <- liftM trim $ Gtk.entryGetText $ redNameEntry settingsWindow
+                            curBlackName <- liftM trim $ Gtk.entryGetText $ blackNameEntry settingsWindow
+                            curRedColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor (redColorButton settingsWindow)
+                            curBlackColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor (blackColorButton settingsWindow)
+                            curBackgroundColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor (backgroundColorButton settingsWindow)
                             curFillingAlpha <- Gtk.get (fillingAlphaSpinButton settingsWindow) Gtk.spinButtonValue
-                            curGridColor <- Gtk.colorButtonGetColor (gridColorButton settingsWindow) >>= return . gtkColorToRgb
+                            curGridColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor (gridColorButton settingsWindow)
                             curHorizontalReflection <- Gtk.toggleButtonGetActive (horizontalReflectionCheckButton settingsWindow)
                             curVerticalReflection <- Gtk.toggleButtonGetActive (verticalReflectionCheckButton settingsWindow)
                             curAiPresent <- Gtk.toggleButtonGetActive (aiPresentCheckButton settingsWindow)
-                            curAiPathMaybe <- Gtk.fileChooserGetFilename (aiPathFileChooserButton settingsWindow) >>= return . fmap decodeString
+                            curAiPathMaybe <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename (aiPathFileChooserButton settingsWindow)
                             curAiRespondent <- Gtk.toggleButtonGetActive (aiRespondentCheckButton settingsWindow)
                             curSimple <- Gtk.toggleButtonGetActive (simpleRadioButton settingsWindow)
                             curWithTime <- Gtk.toggleButtonGetActive (withTimeRadioButton settingsWindow)
-                            curTime <- Gtk.get (withTimeSpinButton settingsWindow) Gtk.spinButtonValue >>= return . round . (*1000)
+                            curTime <- liftM (round . (* 1000)) $ Gtk.get (withTimeSpinButton settingsWindow) Gtk.spinButtonValue
                             curWithComplexity <- Gtk.toggleButtonGetActive (withComplexityRadioButton settingsWindow)
-                            curComplexity <- Gtk.get (withComplexitySpinButton settingsWindow) Gtk.spinButtonValue >>= return . round
+                            curComplexity <- liftM round $ Gtk.get (withComplexitySpinButton settingsWindow) Gtk.spinButtonValue
                             return startSettings { gameWidth = curGameWidth,
                                                    gameHeight = curGameHeight,
                                                    gameName = curGameName,
@@ -450,9 +440,8 @@ createSettingsWindow startSettings f =
        Gtk.toggleButtonSetActive (horizontalReflectionCheckButton settingsWindow) (horizontalReflection startSettings)
        Gtk.toggleButtonSetActive (verticalReflectionCheckButton settingsWindow) (verticalReflection startSettings)
        Gtk.toggleButtonSetActive (aiPresentCheckButton settingsWindow) (aiPresent startSettings)
-       if aiPath startSettings /= ""
-         then Gtk.fileChooserSetFilename (aiPathFileChooserButton settingsWindow) (aiPath startSettings) >> return ()
-         else return ()
+       when (aiPath startSettings /= "") $
+         void $ Gtk.fileChooserSetFilename (aiPathFileChooserButton settingsWindow) (aiPath startSettings)
        Gtk.toggleButtonSetActive (aiRespondentCheckButton settingsWindow) (aiRespondent startSettings)
        case aiGenMoveType startSettings of
          Simple                    -> do timeAdjustment <- Gtk.adjustmentNew 30 0 1000000 0.1 0.1 0
@@ -470,13 +459,13 @@ createSettingsWindow startSettings f =
                                          complexityAdjustment <- Gtk.adjustmentNew (fromIntegral complexity) 0 100 1 1 0
                                          Gtk.spinButtonConfigure (withComplexitySpinButton settingsWindow) complexityAdjustment 0 0
                                          Gtk.toggleButtonSetActive (withTimeRadioButton settingsWindow) True
-       (cancelButton settingsWindow) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+       cancelButton settingsWindow `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
            Gtk.widgetDestroy (settingsDialog settingsWindow)
            return False
-       (applyButton settingsWindow) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+       applyButton settingsWindow `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
            getSettings >>= f
            return False
-       (okButton settingsWindow) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+       okButton settingsWindow `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
            getSettings >>= f
            Gtk.widgetDestroy (settingsDialog settingsWindow)
            return False
@@ -508,33 +497,31 @@ main = do Gtk.initGUI
                           globalSettings <- get globalSettingsRef
                           writeSettings globalSettings "settings.cfg"
                           Gtk.mainQuit
-          (mainWindow window) `Gtk.on` Gtk.deleteEvent $ liftIO $ onExit >> return False
-          (exitMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ onExit >> return False
-          (createMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+          mainWindow window `Gtk.on` Gtk.deleteEvent $ liftIO $ onExit >> return False
+          exitMenuItem window `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ onExit >> return False
+          createMenuItem window `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
                 globalSettings <- get globalSettingsRef
                 curSettingsDialog <- createSettingsWindow globalSettings $ \settings ->
                     gameWithBot (emptyGame settings) (Gtk.postGUIAsync $ botErrorAlert $ emptyGame settings) >>= createGameTab
                 Gtk.dialogRun curSettingsDialog
                 return False
-          (closeMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+          closeMenuItem window `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
                 pageNum <- Gtk.notebookGetCurrentPage (mainNotebook window)
-                if pageNum /= -1
-                  then do tabs <- get tabsRef
-                          let gwb = tabs IntMap.! pageNum
-                          killGWBBot gwb
-                          Gtk.notebookRemovePage (mainNotebook window) pageNum
-                          modifyIORef tabsRef $ IntMap.delete pageNum
-                  else return ()
+                when (pageNum /= -1) $
+                  do tabs <- get tabsRef
+                     let gwb = tabs IntMap.! pageNum
+                     killGWBBot gwb
+                     Gtk.notebookRemovePage (mainNotebook window) pageNum
+                     modifyIORef tabsRef $ IntMap.delete pageNum
                 return False
-          (undoMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+          undoMenuItem window `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
                 pageNum <- Gtk.notebookGetCurrentPage (mainNotebook window)
-                if pageNum /= -1
-                  then do tabs <- get tabsRef
-                          let gwb = tabs IntMap.! pageNum
-                          backGWB gwb
-                  else return ()
+                when (pageNum /= -1) $
+                  do tabs <- get tabsRef
+                     let gwb = tabs IntMap.! pageNum
+                     backGWB gwb
                 return False
-          (settingsMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+          settingsMenuItem window `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
                 pageNum <- Gtk.notebookGetCurrentPage (mainNotebook window)
                 if pageNum /= -1
                   then do Just page <- Gtk.notebookGetNthPage (mainNotebook window) pageNum
@@ -549,11 +536,11 @@ main = do Gtk.initGUI
                                 return ()
                           Gtk.dialogRun curSettingsDialog
                   else do globalSettings <- get globalSettingsRef
-                          curSettingsDialog <- createSettingsWindow globalSettings $ \settings -> do
-                                globalSettingsRef $= settings
+                          curSettingsDialog <- createSettingsWindow globalSettings $ \settings ->
+                            globalSettingsRef $= settings
                           Gtk.dialogRun curSettingsDialog
                 return False
-          (openMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+          openMenuItem window `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
                 fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mainWindow window)) Gtk.FileChooserActionOpen [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]
                 xtFilter <- Gtk.fileFilterNew
                 Gtk.fileFilterAddPattern xtFilter "*.sav"
@@ -566,7 +553,7 @@ main = do Gtk.initGUI
                 response <- Gtk.dialogRun fileChooser
                 case response of
                   Gtk.ResponseCancel -> return ()
-                  Gtk.ResponseOk     -> do maybeFileName <- Gtk.fileChooserGetFilename fileChooser >>= return . fmap decodeString
+                  Gtk.ResponseOk     -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
                                            case maybeFileName of
                                              Just fileName -> do globalSettings <- get globalSettingsRef
                                                                  maybeGame <- XT.load fileName globalSettings
@@ -577,35 +564,33 @@ main = do Gtk.initGUI
                   _                  -> error "fileChooser: uncknown response."
                 Gtk.widgetDestroy fileChooser
                 return False
-          (saveMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+          saveMenuItem window `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
                 pageNum <- Gtk.notebookGetCurrentPage (mainNotebook window)
-                if pageNum /= -1
-                  then do fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mainWindow window)) Gtk.FileChooserActionSave [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]
-                          Gtk.fileChooserSetDoOverwriteConfirmation fileChooser True
-                          xtFilter <- Gtk.fileFilterNew
-                          Gtk.fileFilterAddPattern xtFilter "*.sav"
-                          Gtk.fileFilterSetName xtFilter "PointsXT"
-                          Gtk.fileChooserAddFilter fileChooser xtFilter
-                          response <- Gtk.dialogRun fileChooser
-                          case response of
-                            Gtk.ResponseCancel -> Gtk.widgetDestroy fileChooser
-                            Gtk.ResponseOk     -> do maybeFileName <- Gtk.fileChooserGetFilename fileChooser >>= return . fmap decodeString
-                                                     Gtk.widgetDestroy fileChooser
-                                                     case maybeFileName of
-                                                       Just fileName -> do tabs <- get tabsRef
-                                                                           let gwb = tabs IntMap.! pageNum
-                                                                           game <- get (gwbGame gwb)
-                                                                           saveResult <- XT.save fileName game
-                                                                           if not saveResult
-                                                                             then do messageDialog <- Gtk.messageDialogNew (Just (mainWindow window)) [] Gtk.MessageError Gtk.ButtonsOk "Error: not saved."
-                                                                                     Gtk.dialogRun messageDialog
-                                                                                     Gtk.widgetDestroy messageDialog
-                                                                             else return ()
-                                                       Nothing       -> return ()
-                            _                  -> error "fileChooser: uncknown response."
-                  else return ()
+                when (pageNum /= -1) $
+                  do fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mainWindow window)) Gtk.FileChooserActionSave [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]
+                     Gtk.fileChooserSetDoOverwriteConfirmation fileChooser True
+                     xtFilter <- Gtk.fileFilterNew
+                     Gtk.fileFilterAddPattern xtFilter "*.sav"
+                     Gtk.fileFilterSetName xtFilter "PointsXT"
+                     Gtk.fileChooserAddFilter fileChooser xtFilter
+                     response <- Gtk.dialogRun fileChooser
+                     case response of
+                       Gtk.ResponseCancel -> Gtk.widgetDestroy fileChooser
+                       Gtk.ResponseOk     -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
+                                                Gtk.widgetDestroy fileChooser
+                                                case maybeFileName of
+                                                  Just fileName -> do tabs <- get tabsRef
+                                                                      let gwb = tabs IntMap.! pageNum
+                                                                      game <- get (gwbGame gwb)
+                                                                      saveResult <- XT.save fileName game
+                                                                      unless saveResult $
+                                                                        do messageDialog <- Gtk.messageDialogNew (Just (mainWindow window)) [] Gtk.MessageError Gtk.ButtonsOk "Error: not saved."
+                                                                           Gtk.dialogRun messageDialog
+                                                                           Gtk.widgetDestroy messageDialog
+                                                  Nothing       -> return ()
+                       _                  -> error "fileChooser: uncknown response."
                 return False
-          (aboutMenuItem window) `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
+          aboutMenuItem window `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
                 curAboutDialog <- getAboutDialog
                 Gtk.dialogRun curAboutDialog
                 Gtk.widgetDestroy curAboutDialog

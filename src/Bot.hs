@@ -31,7 +31,7 @@ quit bot = hPutStrLn (stdInput bot) "0 quit"
 listCommands :: Bot -> IO [String]
 listCommands bot =
     do hPutStrLn (stdInput bot) "0 list_commands"
-       ("=" : "0" : "list_commands" : answer) <- hGetLine (stdOutput bot) >>= return . splitOn " "
+       ("=" : "0" : "list_commands" : answer) <- liftM (splitOn " ") $ hGetLine (stdOutput bot)
        return answer
 
 init :: Bot -> Int -> Int -> Int -> IO ()
@@ -43,13 +43,13 @@ init bot width height randomSeed =
 name :: Bot -> IO String
 name bot =
     do hPutStrLn (stdInput bot) "0 name"
-       ("=" : "0" : "name" : [answer]) <- hGetLine (stdOutput bot) >>= return . splitOn " "
+       ("=" : "0" : "name" : [answer]) <- liftM (splitOn " ") $ hGetLine (stdOutput bot)
        return answer
 
 version :: Bot -> IO String
 version bot =
     do hPutStrLn (stdInput bot) "0 version"
-       ("=" : "0" : "version" : [answer]) <- hGetLine (stdOutput bot) >>= return . splitOn " "
+       ("=" : "0" : "version" : [answer]) <- liftM (splitOn " ") $ hGetLine (stdOutput bot)
        return answer
 
 play :: Bot -> Pos -> Player -> IO ()
@@ -58,16 +58,15 @@ play bot pos player =
            strY = show $ snd pos
            strPlayer = if player == Red then "0" else "1"
        hPutStrLn (stdInput bot) ("0 play " ++ strX ++ " " ++ strY ++ " " ++ strPlayer)
-       ("=" : "0" : "play" : answerX : answerY : [answerPlayer]) <- hGetLine (stdOutput bot) >>= return . splitOn " "
-       if answerX /= strX || answerY /= strY || answerPlayer /= strPlayer
-         then error "play: invalid answer."
-         else return ()
+       ("=" : "0" : "play" : answerX : answerY : [answerPlayer]) <- liftM (splitOn " ") $ hGetLine (stdOutput bot)
+       when (answerX /= strX || answerY /= strY || answerPlayer /= strPlayer) $
+         error "play: invalid answer."
 
 genMove :: Bot -> Player -> IO Pos
 genMove bot player =
     do let strPlayer = if player == Red then "0" else "1"
        hPutStrLn (stdInput bot) ("0 gen_move " ++ strPlayer)
-       ("=" : "0" : "gen_move" : answerX : answerY : [answerPlayer]) <- hGetLine (stdOutput bot) >>= return . splitOn " "
+       ("=" : "0" : "gen_move" : answerX : answerY : [answerPlayer]) <- liftM (splitOn " ") $ hGetLine (stdOutput bot)
        if answerPlayer /= strPlayer
          then error "genMove: invalid answer."
          else return (read answerX, read answerY)
@@ -76,7 +75,7 @@ genMoveWithComplexity :: Bot -> Player -> Int -> IO Pos
 genMoveWithComplexity bot player complexity =
     do let strPlayer = if player == Red then "0" else "1"
        hPutStrLn (stdInput bot) ("0 gen_move_with_complexity " ++ strPlayer ++ " " ++ show complexity)
-       ("=" : "0" : "gen_move_with_complexity" : answerX : answerY : [answerPlayer]) <- hGetLine (stdOutput bot) >>= return . splitOn " "
+       ("=" : "0" : "gen_move_with_complexity" : answerX : answerY : [answerPlayer]) <- liftM (splitOn " ") $ hGetLine (stdOutput bot)
        if answerPlayer /= strPlayer
          then error "genMoveWithComplexity: invalid answer."
          else return (read answerX, read answerY)
@@ -85,7 +84,7 @@ genMoveWithTime :: Bot -> Player -> Int -> IO Pos
 genMoveWithTime bot player time =
     do let strPlayer = if player == Red then "0" else "1"
        hPutStrLn (stdInput bot) ("0 gen_move_with_time " ++ strPlayer ++ " " ++ show time)
-       ("=" : "0" : "gen_move_with_time" : answerX : answerY : [answerPlayer]) <- hGetLine (stdOutput bot) >>= return . splitOn " "
+       ("=" : "0" : "gen_move_with_time" : answerX : answerY : [answerPlayer]) <- liftM (splitOn " ") $ hGetLine (stdOutput bot)
        if answerPlayer /= strPlayer
          then error "genMoveWithTime: invalid answer."
          else return (read answerX, read answerY)
@@ -180,7 +179,7 @@ safeUndo bot callbackError callback =
 
 safePlayMany :: Bot -> [(Pos, Player)] -> IO () -> IO () -> IO ThreadId
 safePlayMany bot moves' callbackError callback =
-    forkIO $ do answerEither <- try (mapM_ (\(pos, player) -> play bot pos player) moves') :: IO (Either SomeException ())
+    forkIO $ do answerEither <- try (mapM_ (uncurry $ play bot) moves') :: IO (Either SomeException ())
                 case answerEither of
                   Left _  -> callbackError
                   Right _ -> callback

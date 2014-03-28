@@ -7,5 +7,5 @@ import Game
 
 getMovesList :: Game -> [(Pos, Player)]
 getMovesList game = getMovesList' $ gameTree game
-        where getMovesList' (Node p []) = moves p
-              getMovesList' (Node _ c) = getMovesList' $ head c
+  where getMovesList' (Node p []) = moves p
+        getMovesList' (Node _ c) = getMovesList' $ head c

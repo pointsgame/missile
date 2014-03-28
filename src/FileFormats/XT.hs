@@ -14,20 +14,20 @@ import FileFormats.Common
 
 load :: String -> Settings -> IO (Maybe Game)
 load name settings =
-        do fileEither <- try (BS.readFile name) :: IO (Either SomeException BS.ByteString)
-           case fileEither of
-             Left ex  -> do print ex
-                            return Nothing
-             Right bs -> return $ load' bs settings
+  do fileEither <- try (BS.readFile name) :: IO (Either SomeException BS.ByteString)
+     case fileEither of
+       Left ex  -> do print ex
+                      return Nothing
+       Right bs -> return $ load' bs settings
 
 load' :: BS.ByteString -> Settings-> Maybe Game
 load' byteString settings =
-    if length fields == 1
-    then Nothing
-    else Just Game { curPlayer = nextPlayer $ snd $ head $ moves $ head fields,
-                     gameFields = fields,
-                     gameTree = toTreeInv fields,
-                     gameSettings = newSettings }
+  if length fields == 1
+  then Nothing
+  else Just Game { curPlayer = nextPlayer $ snd $ head $ moves $ head fields,
+                   gameFields = fields,
+                   gameTree = toTreeInv fields,
+                   gameSettings = newSettings }
     where newSettings = settings { gameWidth = 39,
                                    gameHeight = 32,
                                    redName = trim $ decodeStrictByteString CP1251 $ BS.take 9 $ BS.drop 11 byteString,
@@ -46,14 +46,15 @@ load' byteString settings =
                                              else fields'
 
 save :: String -> Game -> IO Bool
-save name game = let bs = save' game
-                 in if BS.null bs
-                    then return False
-                    else do fileEither <- try (BS.writeFile name bs) :: IO (Either SomeException ())
-                            case fileEither of
-                              Left ex -> do print ex
-                                            return False
-                              Right _ -> return True
+save name game =
+  let bs = save' game
+  in if BS.null bs
+     then return False
+     else do fileEither <- try (BS.writeFile name bs) :: IO (Either SomeException ())
+             case fileEither of
+               Left ex -> do print ex
+                             return False
+               Right _ -> return True
 
 save' :: Game -> BS.ByteString
 save' game = if gameWidth settings /= 39 || gameHeight settings /= 32 || gameIsEmpty game

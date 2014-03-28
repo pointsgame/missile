@@ -458,7 +458,7 @@ createSettingsWindow startSettings f =
                                          Gtk.spinButtonConfigure (withTimeSpinButton settingsWindow) timeAdjustment 0 1
                                          complexityAdjustment <- Gtk.adjustmentNew (fromIntegral complexity) 0 100 1 1 0
                                          Gtk.spinButtonConfigure (withComplexitySpinButton settingsWindow) complexityAdjustment 0 0
-                                         Gtk.toggleButtonSetActive (withTimeRadioButton settingsWindow) True
+                                         Gtk.toggleButtonSetActive (withComplexityRadioButton settingsWindow) True
        cancelButton settingsWindow `Gtk.on` Gtk.buttonReleaseEvent $ liftIO $ do
            Gtk.widgetDestroy (settingsDialog settingsWindow)
            return False

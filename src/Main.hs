@@ -60,7 +60,7 @@ toPos settings cellWidth cellHeight x y = let posX = floor $ x / cellWidth
                                               pos = (posX', posY')
                                           in pos
 
-makeVertex :: [(GLfloat, GLfloat)] -> IO ()
+makeVertex :: [(GLfloat, GLfloat)] -> IO ()
 makeVertex = mapM_ (\(x, y) -> vertex $ Vertex2 x y)
 
 ellipse :: (GLfloat, GLfloat) -> GLfloat -> GLfloat -> Int -> [(GLfloat, GLfloat)]

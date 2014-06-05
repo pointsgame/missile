@@ -44,23 +44,23 @@ data Field = Field { scoreRed :: Int,
                      blackEmptyBasePoints :: S.Set Pos }
 
 inField :: Field -> Pos -> Bool
-inField field pos = inRange (bounds (points field)) pos
+inField field = inRange (bounds (points field))
 
 puttingAllow :: Field -> Pos -> Bool
 puttingAllow field pos | not $ inField field pos = False
-                       | (points field) ! pos /= Nothing = False
+                       | isJust $ points field ! pos = False
                        | otherwise = True
 
 playersPoint :: Field -> Pos -> Player -> Bool
 playersPoint field pos player | not $ inField field pos = False
-                              | (points field) ! pos /= Just player = False
+                              | points field ! pos /= Just player = False
                               | otherwise = True
 
 wave :: Field -> Pos -> (Pos -> Bool) -> [Pos]
 wave field startPos f = wave' S.empty (S.singleton startPos)
   where wave' passed front | S.null front = S.elems passed
                            | otherwise = wave' (S.union passed front) (nextFront passed front)
-        nextFront passed front = S.filter f $ (S.fromList $ filter (inField field) $ concatMap neighborhood $ S.elems front) S.\\ passed
+        nextFront passed front = S.filter f $ S.fromList (filter (inField field) $ concatMap neighborhood $ S.elems front) S.\\ passed
         neighborhood pos = [n pos, s pos, w pos, e pos]
 
 {--
@@ -176,7 +176,7 @@ getInputPoints field pos player =
 posInsideRing :: Pos -> [Pos] -> Bool
 posInsideRing (x, y) ring =
   let ring' = removeNearSame $ map snd $ filter ((<= x) . fst) ring
-      ring'' | last ring' == y = ring' ++ [if head ring' == y then head $ tail ring' else head ring']
+      ring'' | last ring' == y = ring' ++ [head $ if head ring' == y then tail ring' else ring']
              | head ring' == y = last ring' : ring'
              | otherwise       = ring'
   in odd $ count (\(a, b, c) -> b == y && ((a < b && c > b) || (a > b && c < b))) $ zip3 ring'' (tail ring'') (tail $ tail ring'')
@@ -191,11 +191,9 @@ getEmptyBase field startPos player = (emptyBaseChain, filter (isNothing . (point
   where emptyBaseChain = getEmptyBaseChain (w startPos)
         getEmptyBaseChain pos | not $ playersPoint field pos player = getEmptyBaseChain (w pos)
                               | otherwise = let inputPoints = getInputPoints field pos player
-                                                chains = catMaybes (map (\(chainPos, _) -> buildChain field pos chainPos player) inputPoints)
+                                                chains = mapMaybe (\(chainPos, _) -> buildChain field pos chainPos player) inputPoints
                                                 result = find (posInsideRing startPos) chains
-                                            in case result of
-                                                 Just chain -> chain
-                                                 Nothing    -> getEmptyBaseChain (w pos)
+                                            in fromMaybe (getEmptyBaseChain (w pos)) result
 
 fst' :: (a1, a2, a3) -> a1
 fst' (a, _, _) = a
@@ -211,16 +209,16 @@ putPoint pos player field | not (puttingAllow field pos) = error "putPos: puttin
                                             inCurEmptyBase = (player == Red && S.member pos (redEmptyBasePoints field)) || (player == Black && S.member pos (blackEmptyBasePoints field))
                                             (enemyEmptyBaseChain, enemyEmptyBase) = getEmptyBase field pos (nextPlayer player)
                                             inputPoints = getInputPoints field pos player
-                                            captures = catMaybes $ map (\(chainPos, capturedPos) ->
+                                            captures = mapMaybe (\(chainPos, capturedPos) ->
                                               do chain <- buildChain field pos chainPos player
                                                  let captured = getInsideRing field capturedPos chain
                                                      capturedCount = count (\pos' -> playersPoint field pos' enemyPlayer) captured
                                                  return (chain, captured, capturedCount)) inputPoints
                                             headCaptures = head captures
                                             deltaScore = sum $ map thd' captures
-                                            newEmptyBase = concat $ map snd' $ filter ((== 0) . thd') captures
-                                            realCaptured = concat $ map snd' $ filter ((/= 0) . thd') captures
-                                            captureChain = concat $ map (reverse . fst') $ filter ((/= 0) . thd') captures
+                                            newEmptyBase = concatMap snd' $ filter ((== 0) . thd') captures
+                                            realCaptured = concatMap snd' $ filter ((/= 0) . thd') captures
+                                            captureChain = concatMap (reverse . fst') $ filter ((/= 0) . thd') captures
                                         in if inEnemyEmptyBase
                                            then if not $ null captures
                                                 then Field { scoreRed = if player == Red then scoreRed field + thd' headCaptures else scoreRed field,

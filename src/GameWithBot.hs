@@ -29,14 +29,13 @@ loadGWBBot :: GameWithBot -> IO ()
 loadGWBBot gwb =
     do game <- get (gwbGame gwb)
        botMaybe <- get (gwbBot gwb)
-       if aiPresent (gameSettings game) && isNothing botMaybe
-         then do gwbBusy gwb $= True
-                 loadBot game (do
-                     gwbBusy gwb $= False
-                     gwbBotError gwb) $ \bot -> do
-                         gwbBot gwb $= Just bot
-                         gwbBusy gwb $= False
-         else return ()
+       when (aiPresent (gameSettings game) && isNothing botMaybe) $
+         do gwbBusy gwb $= True
+            loadBot game (
+              do gwbBusy gwb $= False
+                 gwbBotError gwb) $ \bot ->
+                   do gwbBot gwb $= Just bot
+                      gwbBusy gwb $= False
 
 killGWBBot :: GameWithBot -> IO ()
 killGWBBot gwb =
@@ -91,7 +90,7 @@ putGWBPlayersPoint' game pos player gwb =
                                                  WithComplexity complexity -> safeGenMoveWithComplexity bot player' complexity
                                      in void $ gen (botError gwb) $ \pos' -> do
                                             let game'' = putGamePlayersPoint pos' player' game'
-                                            (gwbGame gwb) $= game''
+                                            gwbGame gwb $= game''
                                             gwbUpdated gwb
                                             void $ safePlay bot pos' player' (botError gwb) $
                                                 gwbBusy gwb $= False
@@ -101,44 +100,38 @@ putGWBPlayersPoint :: Pos -> Player -> GameWithBot -> IO ()
 putGWBPlayersPoint pos player gwb =
     do busy <- get (gwbBusy gwb)
        game <- get (gwbGame gwb)
-       if busy || (not $ puttingAllow (head $ gameFields $ game) pos)
-         then return ()
-         else putGWBPlayersPoint' game pos player gwb
+       unless (busy || not (puttingAllow (head $ gameFields game) pos)) $
+         putGWBPlayersPoint' game pos player gwb
 
 putGWBPoint :: Pos -> GameWithBot -> IO ()
 putGWBPoint pos gwb =
     do busy <- get (gwbBusy gwb)
        game <- get (gwbGame gwb)
-       if busy || (not $ puttingAllow (head $ gameFields $ game) pos)
-         then return ()
-         else putGWBPlayersPoint' game pos (curPlayer game) gwb
+       unless (busy || not (puttingAllow (head $ gameFields game) pos)) $
+         putGWBPlayersPoint' game pos (curPlayer game) gwb
 
 backGWB :: GameWithBot -> IO ()
 backGWB gwb =
     do busy <- get (gwbBusy gwb)
        game <- get (gwbGame gwb)
        botMaybe <- get (gwbBot gwb)
-       if busy || (length $ gameFields game) == 1
-         then return ()
-         else case botMaybe of
-                Nothing  -> do gwbGame gwb $= backGame game
+       unless (busy || length (gameFields game) == 1) $
+         case botMaybe of
+           Nothing  -> do gwbGame gwb $= backGame game
+                          gwbUpdated gwb
+           Just bot -> do gwbBusy gwb $= True
+                          gwbGame gwb $= backGame game
+                          void $ safeUndo bot (botError gwb) $
+                            do gwbBusy gwb $= False
                                gwbUpdated gwb
-                Just bot -> do gwbBusy gwb $= True
-                               gwbGame gwb $= backGame game
-                               void $ safeUndo bot (botError gwb) $ do
-                                       gwbBusy gwb $= False
-                                       gwbUpdated gwb
 
 updateGWBSettings :: GameWithBot -> Settings -> IO ()
 updateGWBSettings gwb settings =
     do game <- get (gwbGame gwb)
        gwbGame gwb $= updateGameSettings game settings
        let oldSettings = gameSettings game
-       if aiPresent oldSettings && not (aiPresent settings)
-         then killGWBBot gwb
-         else if not (aiPresent oldSettings) && aiPresent settings
-         then loadGWBBot gwb
-         else if aiPath oldSettings /= aiPath settings
-         then reloadGWBBot gwb
-         else return ()
+       if | aiPresent oldSettings && not (aiPresent settings) -> killGWBBot gwb
+          | not (aiPresent oldSettings) && aiPresent settings -> loadGWBBot gwb
+          | aiPath oldSettings /= aiPath settings -> reloadGWBBot gwb
+          | otherwise -> return ()
        gwbUpdated gwb

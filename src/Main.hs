@@ -37,7 +37,13 @@ data PreferencesDialog = PreferencesDialog { pdDialog :: Gtk.Dialog,
                                              pdRedColorButton :: Gtk.ColorButton,
                                              pdBlackColorButton :: Gtk.ColorButton,
                                              pdBackgroundColorButton :: Gtk.ColorButton,
-                                             pdGridColorButton :: Gtk.ColorButton }
+                                             pdGridColorButton :: Gtk.ColorButton,
+                                             pdFillingAlphaSpinButton :: Gtk.SpinButton,
+                                             pdHorizontalReflectionCheckButton :: Gtk.CheckButton,
+                                             pdVerticalReflectionCheckButton :: Gtk.CheckButton,
+                                             pdAiPresentCheckButton :: Gtk.CheckButton,
+                                             pdAiPathFileChooserButton :: Gtk.FileChooserButton,
+                                             pdAiRespondentCheckButton :: Gtk.CheckButton }
 
 data GameTab = GameTab { gtWidget :: Gtk.Widget,
                          gtDrawingArea :: Gtk.DrawingArea }
@@ -161,7 +167,13 @@ preferencesDialogNew startSettings =
                                 pdRedColorButton = redColorButton,
                                 pdBlackColorButton = blackColorButton,
                                 pdBackgroundColorButton = backgroundColorButton,
-                                pdGridColorButton = gridColorButton }
+                                pdGridColorButton = gridColorButton,
+                                pdFillingAlphaSpinButton = fillingAlphaSpinButton,
+                                pdHorizontalReflectionCheckButton = horizontalReflectionCheckButton,
+                                pdVerticalReflectionCheckButton = verticalReflectionCheckButton,
+                                pdAiPresentCheckButton = aiPresentCheckButton,
+                                pdAiPathFileChooserButton = aiPathFileChooserButton,
+                                pdAiRespondentCheckButton = aiRespondentCheckButton }
 
 runPreferencesDialog :: PreferencesDialog -> (Settings -> IO ()) -> IO ()
 runPreferencesDialog preferencesDialog f =

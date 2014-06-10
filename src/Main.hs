@@ -389,6 +389,7 @@ mainWindowNew =
      -- Set properties.
      Gtk.windowSetDefaultSize mainWindow 800 600
      mainWindow `Gtk.set` [ Gtk.windowTitle := "Missile" ]
+     Gtk.windowSetIconFromFile mainWindow "Logo.png"
      -- Set hierarchy.
      mainWindow `Gtk.set` [ Gtk.containerChild := vbox ]
      Gtk.containerAdd vbox menuBar

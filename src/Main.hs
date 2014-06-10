@@ -43,7 +43,12 @@ data PreferencesDialog = PreferencesDialog { pdDialog :: Gtk.Dialog,
                                              pdVerticalReflectionCheckButton :: Gtk.CheckButton,
                                              pdAiPresentCheckButton :: Gtk.CheckButton,
                                              pdAiPathFileChooserButton :: Gtk.FileChooserButton,
-                                             pdAiRespondentCheckButton :: Gtk.CheckButton }
+                                             pdAiRespondentCheckButton :: Gtk.CheckButton,
+                                             pdSimpleRadioButton :: Gtk.RadioButton,
+                                             pdWithTimeRadioButton :: Gtk.RadioButton,
+                                             pdWithTimeSpinButton :: Gtk.SpinButton,
+                                             pdWithComplexityRadioButton :: Gtk.RadioButton,
+                                             pdWithComplexitySpinButton :: Gtk.SpinButton }
 
 data GameTab = GameTab { gtWidget :: Gtk.Widget,
                          gtDrawingArea :: Gtk.DrawingArea }
@@ -198,7 +203,12 @@ preferencesDialogNew startSettings =
                                 pdVerticalReflectionCheckButton = verticalReflectionCheckButton,
                                 pdAiPresentCheckButton = aiPresentCheckButton,
                                 pdAiPathFileChooserButton = aiPathFileChooserButton,
-                                pdAiRespondentCheckButton = aiRespondentCheckButton }
+                                pdAiRespondentCheckButton = aiRespondentCheckButton,
+                                pdSimpleRadioButton = simpleRadioButton,
+                                pdWithTimeRadioButton = withTimeRadioButton,
+                                pdWithTimeSpinButton = withTimeSpinButton,
+                                pdWithComplexityRadioButton = withComplexityRadioButton,
+                                pdWithComplexitySpinButton = withComplexitySpinButton }
 
 runPreferencesDialog :: PreferencesDialog -> (Settings -> IO ()) -> IO ()
 runPreferencesDialog preferencesDialog f =

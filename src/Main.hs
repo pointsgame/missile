@@ -99,6 +99,25 @@ preferencesDialogNew startSettings =
      aiPathFileChooserButton <- Gtk.fileChooserButtonNew "Choose AI" Gtk.FileChooserActionOpen
      aiRespondentCheckButton <- Gtk.checkButtonNewWithLabel "AI is respondent"
      genMoveTypeFrame <- Gtk.frameNew
+     genMoveTypeFrameTable <- Gtk.tableNew 3 2 False
+     simpleRadioButton <- Gtk.radioButtonNewWithLabel "Simple"
+     withTimeRadioButton <- Gtk.radioButtonNewWithLabelFromWidget simpleRadioButton "With time"
+     withComplexityRadioButton <- Gtk.radioButtonNewWithLabelFromWidget simpleRadioButton "With complexity"
+     (timeAdjustment, complexityAdjustment) <- case aiGenMoveType startSettings of
+       Simple                    -> do timeAdjustment' <- Gtk.adjustmentNew 30 0 1000000 0.1 0.1 0
+                                       complexityAdjustment' <- Gtk.adjustmentNew 50 0 100 1 1 0
+                                       Gtk.toggleButtonSetActive simpleRadioButton True
+                                       return (timeAdjustment', complexityAdjustment')
+       WithTime time             -> do timeAdjustment' <- Gtk.adjustmentNew (fromIntegral time / 1000) 0 1000000 0.1 0.1 0
+                                       complexityAdjustment' <- Gtk.adjustmentNew 50 0 100 1 1 0
+                                       Gtk.toggleButtonSetActive withTimeRadioButton True
+                                       return (timeAdjustment', complexityAdjustment')
+       WithComplexity complexity -> do timeAdjustment' <- Gtk.adjustmentNew 30 0 1000000 0.1 0.1 0
+                                       complexityAdjustment' <- Gtk.adjustmentNew (fromIntegral complexity) 0 100 1 1 0
+                                       Gtk.toggleButtonSetActive withComplexityRadioButton True
+                                       return (timeAdjustment', complexityAdjustment')
+     withTimeSpinButton <- Gtk.spinButtonNew timeAdjustment 0 1
+     withComplexitySpinButton <- Gtk.spinButtonNew complexityAdjustment 0 0
      -- Set properties.
      preferencesDialog `Gtk.set` [ Gtk.windowTitle := "Preferences" ]
      Gtk.frameSetLabel gameFrame "Game"
@@ -157,6 +176,12 @@ preferencesDialogNew startSettings =
      Gtk.tableAttachDefaults aiFrameTable aiPathFileChooserButton 0 1 1 2
      Gtk.tableAttachDefaults aiFrameTable aiRespondentCheckButton 0 1 2 3
      Gtk.tableAttachDefaults aiFrameTable genMoveTypeFrame 0 1 3 4
+     Gtk.containerAdd genMoveTypeFrame genMoveTypeFrameTable
+     Gtk.tableAttachDefaults genMoveTypeFrameTable simpleRadioButton 0 1 0 1
+     Gtk.tableAttachDefaults genMoveTypeFrameTable withTimeRadioButton 0 1 1 2
+     Gtk.tableAttachDefaults genMoveTypeFrameTable withTimeSpinButton 1 2 1 2
+     Gtk.tableAttachDefaults genMoveTypeFrameTable withComplexityRadioButton 0 1 2 3
+     Gtk.tableAttachDefaults genMoveTypeFrameTable withComplexitySpinButton 1 2 2 3
      -- Return dialog.
      return PreferencesDialog { pdDialog = preferencesDialog,
                                 pdGameNameEntry = gameNameEntry,

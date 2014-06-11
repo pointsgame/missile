@@ -172,7 +172,7 @@ preferencesDialogNew startSettings =
      withTimeSpinButton <- Gtk.spinButtonNew timeAdjustment 0 1
      withComplexitySpinButton <- Gtk.spinButtonNew complexityAdjustment 0 0
      -- Set properties.
-     preferencesDialog `Gtk.set` [ Gtk.windowTitle := "Preferences" ]
+     preferencesDialog `Gtk.set` [Gtk.windowTitle := "Preferences"]
      Gtk.frameSetLabel gameFrame "Game"
      Gtk.entrySetText gameNameEntry (gameName startSettings)
      Gtk.frameSetLabel playersFrame "Players"
@@ -438,10 +438,10 @@ mainWindowNew logo =
      notebook <- Gtk.notebookNew
      -- Set properties.
      Gtk.windowSetDefaultSize mainWindow 800 600
-     mainWindow `Gtk.set` [ Gtk.windowTitle := "Missile" ]
-     mainWindow `Gtk.set` [ Gtk.windowIcon := Just logo ]
+     mainWindow `Gtk.set` [Gtk.windowTitle := "Missile"]
+     mainWindow `Gtk.set` [Gtk.windowIcon := Just logo]
      -- Set hierarchy.
-     mainWindow `Gtk.set` [ Gtk.containerChild := vbox ]
+     mainWindow `Gtk.set` [Gtk.containerChild := vbox]
      Gtk.containerAdd vbox menuBar
      vbox `Gtk.set` [Gtk.boxChildPacking menuBar := Gtk.PackNatural]
      Gtk.containerAdd menuBar fileImageMenuItem
@@ -473,8 +473,8 @@ mainWindowNew logo =
                          mwAboutImageMenuItem = aboutImageMenuItem,
                          mwNotebook = notebook }
 
-listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameTab, GameWithBot)) -> MainWindow -> Gtk.Pixbuf -> IO ()
-listenMainWindow globalSettingsRef tabsRef mainWindow logo =
+listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameTab, GameWithBot)) -> MainWindow -> Gtk.Pixbuf -> String -> IO ()
+listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
   let onExit =
         do tabs <- get tabsRef
            mapM_ (killGWBBot . snd) $ IntMap.elems tabs
@@ -522,7 +522,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo =
                   Gtk.widgetQueueDraw $ gtDrawingArea gameTab
         mwOpenImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mwWindow mainWindow)) Gtk.FileChooserActionOpen [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]
-             fileChooser `Gtk.set` [ Gtk.windowTitle := "Choose save of game" ]
+             fileChooser `Gtk.set` [Gtk.windowTitle := "Choose save of game"]
              xtFilter <- Gtk.fileFilterNew
              Gtk.fileFilterAddPattern xtFilter "*.sav"
              Gtk.fileFilterSetName xtFilter "PointsXT"
@@ -591,6 +591,9 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo =
           do aboutDialog <- Gtk.aboutDialogNew
              aboutDialog `Gtk.set` [Gtk.aboutDialogProgramName := "Missile"]
              aboutDialog `Gtk.set` [Gtk.aboutDialogVersion := "3.0.0"]
+             aboutDialog `Gtk.set` [Gtk.aboutDialogLicense := Just license]
+             aboutDialog `Gtk.set` [Gtk.aboutDialogWebsite := "https://gitorious.org/opai/missile"]
+             aboutDialog `Gtk.set` [Gtk.aboutDialogAuthors := ["Kurnevsky Evgeny"]]
              aboutDialog `Gtk.set` [Gtk.aboutDialogLogo := Just logo]
              Gtk.dialogRun aboutDialog
              Gtk.widgetDestroy aboutDialog
@@ -602,7 +605,8 @@ main =
      globalSettingsRef <- readSettings "settings.cfg" >>= newIORef
      tabsRef <- newIORef IntMap.empty
      logo <- Gtk.pixbufNewFromFile "Logo.png"
+     license <- readFile "LICENSE"
      mainWindow <- mainWindowNew logo
-     listenMainWindow globalSettingsRef tabsRef mainWindow logo
+     listenMainWindow globalSettingsRef tabsRef mainWindow logo license
      Gtk.widgetShowAll (mwWindow mainWindow)
      Gtk.mainGUI

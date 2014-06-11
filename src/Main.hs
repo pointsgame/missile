@@ -477,7 +477,7 @@ listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameTab, GameWithBot
 listenMainWindow globalSettingsRef tabsRef mainWindow =
   let onExit =
         do tabs <- get tabsRef
-           mapM_ killGWBBot $ map snd $ IntMap.elems tabs
+           mapM_ (killGWBBot . snd) $ IntMap.elems tabs
            globalSettings <- get globalSettingsRef
            writeSettings globalSettings "settings.cfg"
            Gtk.mainQuit

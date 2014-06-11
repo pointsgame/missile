@@ -568,6 +568,24 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                                                     Nothing       -> savingErrorAkert $ mwWindow mainWindow
                     _                       -> error $ "fileChooser: unexpected response: " ++ show response
                   Gtk.widgetDestroy fileChooser
+        mwPreferencesImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
+          do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
+             if pageNum /= -1
+               then do tabs <- get tabsRef
+                       let (gameTab, gwb) = tabs IntMap.! pageNum
+                       game <- get (gwbGame gwb)
+                       let settings = gameSettings game
+                       preferencesDialog <- preferencesDialogNew settings
+                       runPreferencesDialog settings preferencesDialog $ \newSettings ->
+                         do updateGWBSettings gwb newSettings
+                            Gtk.notebookSetTabLabelText (mwNotebook mainWindow) (gtWidget gameTab) (gameName newSettings)
+                            game' <- get (gwbGame gwb)
+                            modifyIORef tabsRef $ IntMap.insert pageNum (gameTab, gwb { gwbBotError = botErrorAlert game' (mwWindow mainWindow) })
+                            return ()
+               else do globalSettings <- get globalSettingsRef
+                       preferencesDialog <- preferencesDialogNew globalSettings
+                       runPreferencesDialog globalSettings preferencesDialog $ \newSettings ->
+                         globalSettingsRef $= newSettings
         return ()
 
 main :: IO ()

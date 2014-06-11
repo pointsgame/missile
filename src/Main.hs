@@ -409,7 +409,7 @@ listenGameTab gwb gameTab =
                            posY = toPos (verticalReflection settings) height' (fieldHeight headField) y'
                            pos = (posX, posY)
                        putGWBPoint pos gwb
-                       Gtk.widgetQueueDraw (gtDrawingArea gameTab)
+                       Gtk.widgetQueueDraw $ gtDrawingArea gameTab
      return ()
 
 mainWindowNew :: IO MainWindow
@@ -472,11 +472,11 @@ mainWindowNew =
                          mwAboutImageMenuItem = aboutImageMenuItem,
                          mwNotebook = notebook }
 
-listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap GameWithBot) -> MainWindow -> IO ()
+listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameTab, GameWithBot)) -> MainWindow -> IO ()
 listenMainWindow globalSettingsRef tabsRef mainWindow =
   let onExit =
         do tabs <- readIORef tabsRef
-           mapM_ killGWBBot (IntMap.elems tabs)
+           mapM_ killGWBBot $ map snd $ IntMap.elems tabs
            globalSettings <- readIORef globalSettingsRef
            writeSettings globalSettings "settings.cfg"
            Gtk.mainQuit
@@ -493,7 +493,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
            gameTab <- gameTabNew
            listenGameTab gwb gameTab
            pageIndex <- Gtk.notebookAppendPage notebook (gtWidget gameTab) (gameName $ gameSettings game)
-           modifyIORef tabsRef $ IntMap.insert pageIndex gwb
+           modifyIORef tabsRef $ IntMap.insert pageIndex (gameTab, gwb)
            Gtk.widgetShowAll notebook
            Gtk.notebookSetCurrentPage notebook pageIndex
   in do mwWindow mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ onExit >> return False
@@ -507,7 +507,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
                do tabs <- readIORef tabsRef
-                  let gwb = tabs IntMap.! pageNum
+                  let (_, gwb) = tabs IntMap.! pageNum
                   killGWBBot gwb
                   Gtk.notebookRemovePage (mwNotebook mainWindow) pageNum
                   modifyIORef tabsRef $ IntMap.delete pageNum
@@ -515,7 +515,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
                do tabs <- readIORef tabsRef
-                  let gwb = tabs IntMap.! pageNum
+                  let (_, gwb) = tabs IntMap.! pageNum
                   backGWB gwb
         mwOpenImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mwWindow mainWindow)) Gtk.FileChooserActionOpen [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]
@@ -559,7 +559,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                     Gtk.ResponseOk          -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
                                                   case maybeFileName of
                                                     Just fileName -> do tabs <- readIORef tabsRef
-                                                                        let gwb = tabs IntMap.! pageNum
+                                                                        let (_, gwb) = tabs IntMap.! pageNum
                                                                         game <- readIORef (gwbGame gwb)
                                                                         saveResult <- XT.save fileName game
                                                                         unless saveResult $ savingErrorAkert $ mwWindow mainWindow
@@ -570,9 +570,9 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
                do tabs <- readIORef tabsRef
-                  let gwb = tabs IntMap.! pageNum
+                  let (gameTab, gwb) = tabs IntMap.! pageNum
                   backGWB gwb
-                  --Gtk.widgetQueueDraw (gtDrawingArea gameTab)
+                  Gtk.widgetQueueDraw $ gtDrawingArea gameTab
         return ()
 
 main :: IO ()

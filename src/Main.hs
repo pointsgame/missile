@@ -492,9 +492,10 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
       createGameTab notebook gwb =
         do game <- get (gwbGame gwb)
            gameTab <- gameTabNew
-           listenGameTab gwb gameTab
+           let gwb' = gwb { gwbUpdated = Gtk.widgetQueueDraw $ gtDrawingArea gameTab }
+           listenGameTab gwb' gameTab
            pageIndex <- Gtk.notebookAppendPage notebook (gtWidget gameTab) (gameName $ gameSettings game)
-           modifyIORef tabsRef $ IntMap.insert pageIndex (gameTab, gwb)
+           modifyIORef tabsRef $ IntMap.insert pageIndex (gameTab, gwb')
            Gtk.widgetShowAll notebook
            Gtk.notebookSetCurrentPage notebook pageIndex
   in do mwWindow mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ onExit >> return False

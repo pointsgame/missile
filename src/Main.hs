@@ -484,6 +484,10 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
         do messageDialog <- Gtk.messageDialogNew (Just window) [] Gtk.MessageError Gtk.ButtonsOk $ gameName (gameSettings game) ++ ": Bot made a mistake. It is killed."
            Gtk.dialogRun messageDialog
            Gtk.widgetDestroy messageDialog
+      savingErrorAkert window =
+        do messageDialog <- Gtk.messageDialogNew (Just window) [] Gtk.MessageError Gtk.ButtonsOk "Error: not saved."
+           Gtk.dialogRun messageDialog
+           Gtk.widgetDestroy messageDialog
       createGameTab notebook gwb =
         do game <- readIORef (gwbGame gwb)
            gameTab <- gameTabNew
@@ -550,21 +554,18 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                   Gtk.fileChooserAddFilter fileChooser xtFilter
                   response <- Gtk.dialogRun fileChooser
                   case response of
-                    Gtk.ResponseDeleteEvent -> Gtk.widgetDestroy fileChooser
-                    Gtk.ResponseCancel      -> Gtk.widgetDestroy fileChooser
+                    Gtk.ResponseDeleteEvent -> return ()
+                    Gtk.ResponseCancel      -> return ()
                     Gtk.ResponseOk          -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
-                                                  Gtk.widgetDestroy fileChooser
                                                   case maybeFileName of
                                                     Just fileName -> do tabs <- readIORef tabsRef
                                                                         let gwb = tabs IntMap.! pageNum
                                                                         game <- readIORef (gwbGame gwb)
                                                                         saveResult <- XT.save fileName game
-                                                                        unless saveResult $
-                                                                          do messageDialog <- Gtk.messageDialogNew (Just (mwWindow mainWindow)) [] Gtk.MessageError Gtk.ButtonsOk "Error: not saved."
-                                                                             Gtk.dialogRun messageDialog
-                                                                             Gtk.widgetDestroy messageDialog
-                                                    Nothing       -> return ()
+                                                                        unless saveResult $ savingErrorAkert $ mwWindow mainWindow
+                                                    Nothing       -> savingErrorAkert $ mwWindow mainWindow
                     _                       -> error "fileChooser: uncknown response."
+                  Gtk.widgetDestroy fileChooser
         return ()
 
 main :: IO ()

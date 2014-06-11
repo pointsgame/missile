@@ -550,20 +550,21 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                   Gtk.fileChooserAddFilter fileChooser xtFilter
                   response <- Gtk.dialogRun fileChooser
                   case response of
-                    Gtk.ResponseCancel -> Gtk.widgetDestroy fileChooser
-                    Gtk.ResponseOk     -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
-                                             Gtk.widgetDestroy fileChooser
-                                             case maybeFileName of
-                                               Just fileName -> do tabs <- readIORef tabsRef
-                                                                   let gwb = tabs IntMap.! pageNum
-                                                                   game <- readIORef (gwbGame gwb)
-                                                                   saveResult <- XT.save fileName game
-                                                                   unless saveResult $
-                                                                     do messageDialog <- Gtk.messageDialogNew (Just (mwWindow mainWindow)) [] Gtk.MessageError Gtk.ButtonsOk "Error: not saved."
-                                                                        Gtk.dialogRun messageDialog
-                                                                        Gtk.widgetDestroy messageDialog
-                                               Nothing       -> return ()
-                    _                  -> error "fileChooser: uncknown response."
+                    Gtk.ResponseDeleteEvent -> return ()
+                    Gtk.ResponseCancel      -> Gtk.widgetDestroy fileChooser
+                    Gtk.ResponseOk          -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
+                                                  Gtk.widgetDestroy fileChooser
+                                                  case maybeFileName of
+                                                    Just fileName -> do tabs <- readIORef tabsRef
+                                                                        let gwb = tabs IntMap.! pageNum
+                                                                        game <- readIORef (gwbGame gwb)
+                                                                        saveResult <- XT.save fileName game
+                                                                        unless saveResult $
+                                                                          do messageDialog <- Gtk.messageDialogNew (Just (mwWindow mainWindow)) [] Gtk.MessageError Gtk.ButtonsOk "Error: not saved."
+                                                                             Gtk.dialogRun messageDialog
+                                                                             Gtk.widgetDestroy messageDialog
+                                                    Nothing       -> return ()
+                    _                       -> error "fileChooser: uncknown response."
         return ()
 
 main :: IO ()

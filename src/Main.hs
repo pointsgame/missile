@@ -550,7 +550,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                   Gtk.fileChooserAddFilter fileChooser xtFilter
                   response <- Gtk.dialogRun fileChooser
                   case response of
-                    Gtk.ResponseDeleteEvent -> return ()
+                    Gtk.ResponseDeleteEvent -> Gtk.widgetDestroy fileChooser
                     Gtk.ResponseCancel      -> Gtk.widgetDestroy fileChooser
                     Gtk.ResponseOk          -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
                                                   Gtk.widgetDestroy fileChooser

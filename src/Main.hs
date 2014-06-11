@@ -492,7 +492,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
       createGameTab notebook gwb =
         do game <- get (gwbGame gwb)
            gameTab <- gameTabNew
-           let gwb' = gwb { gwbUpdated = Gtk.widgetQueueDraw $ gtDrawingArea gameTab }
+           let gwb' = gwb { gwbUpdated = Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ gtDrawingArea gameTab }
            listenGameTab gwb' gameTab
            pageIndex <- Gtk.notebookAppendPage notebook (gtWidget gameTab) (gameName $ gameSettings game)
            modifyIORef tabsRef $ IntMap.insert pageIndex (gameTab, gwb')

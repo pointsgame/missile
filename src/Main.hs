@@ -413,8 +413,8 @@ listenGameTab gwb gameTab =
                        Gtk.widgetQueueDraw $ gtDrawingArea gameTab
      return ()
 
-mainWindowNew :: IO MainWindow
-mainWindowNew =
+mainWindowNew :: Gtk.Pixbuf -> IO MainWindow
+mainWindowNew logo =
   do -- Create widgets.
      mainWindow <- Gtk.windowNew
      vbox <- Gtk.vBoxNew False 1
@@ -439,7 +439,7 @@ mainWindowNew =
      -- Set properties.
      Gtk.windowSetDefaultSize mainWindow 800 600
      mainWindow `Gtk.set` [ Gtk.windowTitle := "Missile" ]
-     Gtk.windowSetIconFromFile mainWindow "Logo.png"
+     mainWindow `Gtk.set` [ Gtk.windowIcon := Just logo ]
      -- Set hierarchy.
      mainWindow `Gtk.set` [ Gtk.containerChild := vbox ]
      Gtk.containerAdd vbox menuBar
@@ -473,8 +473,8 @@ mainWindowNew =
                          mwAboutImageMenuItem = aboutImageMenuItem,
                          mwNotebook = notebook }
 
-listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameTab, GameWithBot)) -> MainWindow -> IO ()
-listenMainWindow globalSettingsRef tabsRef mainWindow =
+listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameTab, GameWithBot)) -> MainWindow -> Gtk.Pixbuf -> IO ()
+listenMainWindow globalSettingsRef tabsRef mainWindow logo =
   let onExit =
         do tabs <- get tabsRef
            mapM_ (killGWBBot . snd) $ IntMap.elems tabs
@@ -587,6 +587,13 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                        preferencesDialog <- preferencesDialogNew globalSettings
                        runPreferencesDialog globalSettings preferencesDialog $ \newSettings ->
                          globalSettingsRef $= newSettings
+        mwAboutImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
+          do aboutDialog <- Gtk.aboutDialogNew
+             aboutDialog `Gtk.set` [Gtk.aboutDialogProgramName := "Missile"]
+             aboutDialog `Gtk.set` [Gtk.aboutDialogVersion := "3.0.0"]
+             aboutDialog `Gtk.set` [Gtk.aboutDialogLogo := Just logo]
+             Gtk.dialogRun aboutDialog
+             Gtk.widgetDestroy aboutDialog
         return ()
 
 main :: IO ()
@@ -594,7 +601,8 @@ main =
   do Gtk.initGUI
      globalSettingsRef <- readSettings "settings.cfg" >>= newIORef
      tabsRef <- newIORef IntMap.empty
-     mainWindow <- mainWindowNew
-     listenMainWindow globalSettingsRef tabsRef mainWindow
+     logo <- Gtk.pixbufNewFromFile "Logo.png"
+     mainWindow <- mainWindowNew logo
+     listenMainWindow globalSettingsRef tabsRef mainWindow logo
      Gtk.widgetShowAll (mwWindow mainWindow)
      Gtk.mainGUI

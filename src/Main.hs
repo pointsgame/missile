@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Data.Maybe
 import qualified Data.IntMap as IntMap
 import Control.Monad
 import Control.Monad.IO.Class
@@ -16,6 +17,7 @@ import Settings
 import Game
 import GameWithBot
 import qualified FileFormats.XT as XT
+import Auxiliary
 
 data MainWindow = MainWindow { mwWindow :: Gtk.Window,
                                mwNewImageMenuItem :: Gtk.ImageMenuItem,
@@ -57,6 +59,51 @@ rgbToGtkColor :: RGB Double -> Gtk.Color
 rgbToGtkColor (Colour.RGB r g b) =
   let Colour.RGB r' g' b' = toSRGBBounded $ sRGB r g b
   in Gtk.Color r' g' b'
+
+gtkColorToRgb :: Gtk.Color -> RGB Double
+gtkColorToRgb (Gtk.Color r g b) = toSRGB $ sRGBBounded r g b
+
+getSettings :: Settings -> PreferencesDialog -> IO Settings
+getSettings startSettings preferencesDialog =
+  do curGameWidth <- liftM round $ Gtk.get (pdFieldWidthSpinButton preferencesDialog) Gtk.spinButtonValue
+     curGameHeight <- liftM round $ Gtk.get (pdFieldHeightSpinButton preferencesDialog) Gtk.spinButtonValue
+     curGameName <- liftM trim $ Gtk.entryGetText $ pdGameNameEntry preferencesDialog
+     curRedName <- liftM trim $ Gtk.entryGetText $ pdRedNameEntry preferencesDialog
+     curBlackName <- liftM trim $ Gtk.entryGetText $ pdBlackNameEntry preferencesDialog
+     curRedColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdRedColorButton preferencesDialog
+     curBlackColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBlackColorButton preferencesDialog
+     curBackgroundColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBackgroundColorButton preferencesDialog
+     curFillingAlpha <- Gtk.get (pdFillingAlphaSpinButton preferencesDialog) Gtk.spinButtonValue
+     curGridColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdGridColorButton preferencesDialog
+     curHorizontalReflection <- Gtk.toggleButtonGetActive $ pdHorizontalReflectionCheckButton preferencesDialog
+     curVerticalReflection <- Gtk.toggleButtonGetActive $ pdVerticalReflectionCheckButton preferencesDialog
+     curAiPresent <- Gtk.toggleButtonGetActive $ pdAiPresentCheckButton preferencesDialog
+     curAiPathMaybe <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename $ pdAiPathFileChooserButton preferencesDialog
+     curAiRespondent <- Gtk.toggleButtonGetActive $ pdAiRespondentCheckButton preferencesDialog
+     curSimple <- Gtk.toggleButtonGetActive $ pdSimpleRadioButton preferencesDialog
+     curWithTime <- Gtk.toggleButtonGetActive $ pdWithTimeRadioButton preferencesDialog
+     curTime <- liftM (round . (* 1000)) $ Gtk.get (pdWithTimeSpinButton preferencesDialog) Gtk.spinButtonValue
+     curWithComplexity <- Gtk.toggleButtonGetActive $ pdWithComplexityRadioButton preferencesDialog
+     curComplexity <- liftM round $ Gtk.get (pdWithComplexitySpinButton preferencesDialog) Gtk.spinButtonValue
+     return startSettings { gameWidth = curGameWidth,
+                            gameHeight = curGameHeight,
+                            gameName = curGameName,
+                            redName = curRedName,
+                            blackName = curBlackName,
+                            redColor = curRedColor,
+                            blackColor = curBlackColor,
+                            backgroundColor = curBackgroundColor,
+                            gridColor = curGridColor,
+                            fillingAlpha = curFillingAlpha,
+                            horizontalReflection = curHorizontalReflection,
+                            verticalReflection = curVerticalReflection,
+                            aiPresent = curAiPresent && isJust curAiPathMaybe,
+                            aiPath = fromMaybe "" curAiPathMaybe,
+                            aiRespondent = curAiRespondent,
+                            aiGenMoveType = if | curSimple         -> Simple
+                                               | curWithTime       -> WithTime curTime
+                                               | curWithComplexity -> WithComplexity curComplexity
+                                               | otherwise         -> error "Type of move generation not specified!" }
 
 preferencesDialogNew :: Settings -> IO PreferencesDialog
 preferencesDialogNew startSettings =
@@ -210,15 +257,17 @@ preferencesDialogNew startSettings =
                                 pdWithComplexityRadioButton = withComplexityRadioButton,
                                 pdWithComplexitySpinButton = withComplexitySpinButton }
 
-runPreferencesDialog :: PreferencesDialog -> (Settings -> IO ()) -> IO ()
-runPreferencesDialog preferencesDialog f =
+runPreferencesDialog :: Settings -> PreferencesDialog -> (Settings -> IO ()) -> IO ()
+runPreferencesDialog startSettings preferencesDialog f =
   do Gtk.widgetShowAll $ pdDialog preferencesDialog
      response <- Gtk.dialogRun $ pdDialog preferencesDialog
      case response of
        Gtk.ResponseDeleteEvent -> Gtk.widgetDestroy $ pdDialog preferencesDialog
-       Gtk.ResponseApply       -> do f defaultSettings
-                                     runPreferencesDialog preferencesDialog f
-       Gtk.ResponseOk          -> do f defaultSettings
+       Gtk.ResponseApply       -> do settings <- getSettings startSettings preferencesDialog
+                                     f settings
+                                     runPreferencesDialog startSettings preferencesDialog f
+       Gtk.ResponseOk          -> do settings <- getSettings startSettings preferencesDialog
+                                     f settings
                                      Gtk.widgetDestroy $ pdDialog preferencesDialog
        Gtk.ResponseCancel      -> Gtk.widgetDestroy $ pdDialog preferencesDialog
        _                       -> error $ "preferencesDialog: unexpected response: " ++ show response
@@ -291,13 +340,13 @@ draw game width height =
      Cairo.setAntialias Cairo.AntialiasBest
      mapM_ (\((x, y), player) ->
        do setSourceRGB $ if player == Red then redColor settings else blackColor settings
-          Cairo.arc (fromPosX x) (fromPosY y) (pointRadius settings * width' / 230) 0 (2 * pi)
+          Cairo.arc (fromPosX x) (fromPosY y) (pointRadius settings * width' / gameFieldWidth / 5) 0 (2 * pi)
           Cairo.fill) $ moves headField
      --Rendering last point.
      unless (null $ moves headField) $ (\((x, y), player) ->
        do Cairo.setLineWidth 2
           setSourceRGB $ if player == Red then redColor settings else blackColor settings
-          Cairo.arc (fromPosX x) (fromPosY y) (pointRadius settings * width' / 150) 0 (2 * pi)
+          Cairo.arc (fromPosX x) (fromPosY y) (pointRadius settings * width' / gameFieldWidth / 3) 0 (2 * pi)
           Cairo.stroke) $ head $ moves headField
      --Rendering little surrounds.
      Cairo.setAntialias Cairo.AntialiasNone
@@ -448,7 +497,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
         mwNewImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do globalSettings <- readIORef globalSettingsRef
              preferencesDialog <- preferencesDialogNew globalSettings
-             runPreferencesDialog preferencesDialog $ \settings ->
+             runPreferencesDialog globalSettings preferencesDialog $ \settings ->
                gameWithBot (emptyGame settings) (Gtk.postGUIAsync $ botErrorAlert (emptyGame settings) (mwWindow mainWindow)) >>= createGameTab (mwNotebook mainWindow)
         mwCloseImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)

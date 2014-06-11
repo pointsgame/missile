@@ -564,7 +564,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                                                                         saveResult <- XT.save fileName game
                                                                         unless saveResult $ savingErrorAkert $ mwWindow mainWindow
                                                     Nothing       -> savingErrorAkert $ mwWindow mainWindow
-                    _                       -> error "fileChooser: uncknown response."
+                    _                       -> error $ "fileChooser: unexpected response: " ++ show response
                   Gtk.widgetDestroy fileChooser
         return ()
 

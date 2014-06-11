@@ -516,8 +516,9 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
                do tabs <- get tabsRef
-                  let (_, gwb) = tabs IntMap.! pageNum
+                  let (gameTab, gwb) = tabs IntMap.! pageNum
                   backGWB gwb
+                  Gtk.widgetQueueDraw $ gtDrawingArea gameTab
         mwOpenImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mwWindow mainWindow)) Gtk.FileChooserActionOpen [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]
              fileChooser `Gtk.set` [ Gtk.windowTitle := "Choose save of game" ]
@@ -567,13 +568,6 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                                                     Nothing       -> savingErrorAkert $ mwWindow mainWindow
                     _                       -> error $ "fileChooser: unexpected response: " ++ show response
                   Gtk.widgetDestroy fileChooser
-        mwUndoImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
-          do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
-             when (pageNum /= -1) $
-               do tabs <- get tabsRef
-                  let (gameTab, gwb) = tabs IntMap.! pageNum
-                  backGWB gwb
-                  Gtk.widgetQueueDraw $ gtDrawingArea gameTab
         return ()
 
 main :: IO ()

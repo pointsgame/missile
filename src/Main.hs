@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Data.Maybe
+import Data.StateVar
 import qualified Data.IntMap as IntMap
 import Control.Monad
 import Control.Monad.IO.Class
@@ -384,14 +385,14 @@ draw game width height =
 listenGameTab :: GameWithBot -> GameTab -> IO ()
 listenGameTab gwb gameTab =
   do gtDrawingArea gameTab `Gtk.on` Gtk.draw $
-       do game <- liftIO $ readIORef (gwbGame gwb)
+       do game <- liftIO $ get (gwbGame gwb)
           width <- liftIO $ Gtk.widgetGetAllocatedWidth $ gtDrawingArea gameTab
           height <- liftIO $ Gtk.widgetGetAllocatedHeight $ gtDrawingArea gameTab
           draw game (fromIntegral width) (fromIntegral height)
      gtDrawingArea gameTab `Gtk.on` Gtk.buttonPressEvent $ Gtk.tryEvent $
         do Gtk.LeftButton <- Gtk.eventButton
            (x, y) <- Gtk.eventCoordinates
-           liftIO $ do game <- readIORef (gwbGame gwb)
+           liftIO $ do game <- get (gwbGame gwb)
                        width <- liftM fromIntegral $ liftIO $ Gtk.widgetGetAllocatedWidth $ gtDrawingArea gameTab
                        height <- liftM fromIntegral $ liftIO $ Gtk.widgetGetAllocatedHeight $ gtDrawingArea gameTab
                        let fields = gameFields game
@@ -475,9 +476,9 @@ mainWindowNew =
 listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameTab, GameWithBot)) -> MainWindow -> IO ()
 listenMainWindow globalSettingsRef tabsRef mainWindow =
   let onExit =
-        do tabs <- readIORef tabsRef
+        do tabs <- get tabsRef
            mapM_ killGWBBot $ map snd $ IntMap.elems tabs
-           globalSettings <- readIORef globalSettingsRef
+           globalSettings <- get globalSettingsRef
            writeSettings globalSettings "settings.cfg"
            Gtk.mainQuit
       botErrorAlert game window =
@@ -489,7 +490,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
            Gtk.dialogRun messageDialog
            Gtk.widgetDestroy messageDialog
       createGameTab notebook gwb =
-        do game <- readIORef (gwbGame gwb)
+        do game <- get (gwbGame gwb)
            gameTab <- gameTabNew
            listenGameTab gwb gameTab
            pageIndex <- Gtk.notebookAppendPage notebook (gtWidget gameTab) (gameName $ gameSettings game)
@@ -499,14 +500,14 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
   in do mwWindow mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ onExit >> return False
         mwQuitImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO onExit
         mwNewImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
-          do globalSettings <- readIORef globalSettingsRef
+          do globalSettings <- get globalSettingsRef
              preferencesDialog <- preferencesDialogNew globalSettings
              runPreferencesDialog globalSettings preferencesDialog $ \settings ->
                gameWithBot (emptyGame settings) (Gtk.postGUIAsync $ botErrorAlert (emptyGame settings) (mwWindow mainWindow)) >>= createGameTab (mwNotebook mainWindow)
         mwCloseImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
-               do tabs <- readIORef tabsRef
+               do tabs <- get tabsRef
                   let (_, gwb) = tabs IntMap.! pageNum
                   killGWBBot gwb
                   Gtk.notebookRemovePage (mwNotebook mainWindow) pageNum
@@ -514,7 +515,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
         mwUndoImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
-               do tabs <- readIORef tabsRef
+               do tabs <- get tabsRef
                   let (_, gwb) = tabs IntMap.! pageNum
                   backGWB gwb
         mwOpenImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
@@ -535,7 +536,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                Gtk.ResponseOk          -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
                                              case maybeFileName of
                                                Just fileName ->
-                                                 do globalSettings <- readIORef globalSettingsRef
+                                                 do globalSettings <- get globalSettingsRef
                                                     maybeGame <- XT.load fileName globalSettings
                                                     case maybeGame of
                                                       Just game -> gameWithBot game (Gtk.postGUIAsync $ botErrorAlert game (mwWindow mainWindow)) >>= createGameTab (mwNotebook mainWindow)
@@ -558,9 +559,9 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                     Gtk.ResponseCancel      -> return ()
                     Gtk.ResponseOk          -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
                                                   case maybeFileName of
-                                                    Just fileName -> do tabs <- readIORef tabsRef
+                                                    Just fileName -> do tabs <- get tabsRef
                                                                         let (_, gwb) = tabs IntMap.! pageNum
-                                                                        game <- readIORef (gwbGame gwb)
+                                                                        game <- get (gwbGame gwb)
                                                                         saveResult <- XT.save fileName game
                                                                         unless saveResult $ savingErrorAkert $ mwWindow mainWindow
                                                     Nothing       -> savingErrorAkert $ mwWindow mainWindow
@@ -569,7 +570,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
         mwUndoImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
-               do tabs <- readIORef tabsRef
+               do tabs <- get tabsRef
                   let (gameTab, gwb) = tabs IntMap.! pageNum
                   backGWB gwb
                   Gtk.widgetQueueDraw $ gtDrawingArea gameTab

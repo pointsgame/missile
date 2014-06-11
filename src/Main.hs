@@ -539,6 +539,31 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                                                Nothing       -> return ()
                _                       -> error $ "fileChooser: unexpected response: " ++ show response
              Gtk.widgetDestroy fileChooser
+        mwSaveImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
+          do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
+             when (pageNum /= -1) $
+               do fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mwWindow mainWindow)) Gtk.FileChooserActionSave [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]
+                  Gtk.fileChooserSetDoOverwriteConfirmation fileChooser True
+                  xtFilter <- Gtk.fileFilterNew
+                  Gtk.fileFilterAddPattern xtFilter "*.sav"
+                  Gtk.fileFilterSetName xtFilter "PointsXT"
+                  Gtk.fileChooserAddFilter fileChooser xtFilter
+                  response <- Gtk.dialogRun fileChooser
+                  case response of
+                    Gtk.ResponseCancel -> Gtk.widgetDestroy fileChooser
+                    Gtk.ResponseOk     -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
+                                             Gtk.widgetDestroy fileChooser
+                                             case maybeFileName of
+                                               Just fileName -> do tabs <- readIORef tabsRef
+                                                                   let gwb = tabs IntMap.! pageNum
+                                                                   game <- readIORef (gwbGame gwb)
+                                                                   saveResult <- XT.save fileName game
+                                                                   unless saveResult $
+                                                                     do messageDialog <- Gtk.messageDialogNew (Just (mwWindow mainWindow)) [] Gtk.MessageError Gtk.ButtonsOk "Error: not saved."
+                                                                        Gtk.dialogRun messageDialog
+                                                                        Gtk.widgetDestroy messageDialog
+                                               Nothing       -> return ()
+                    _                  -> error "fileChooser: uncknown response."
         return ()
 
 main :: IO ()

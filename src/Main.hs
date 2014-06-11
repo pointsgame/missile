@@ -566,6 +566,13 @@ listenMainWindow globalSettingsRef tabsRef mainWindow =
                                                     Nothing       -> savingErrorAkert $ mwWindow mainWindow
                     _                       -> error $ "fileChooser: unexpected response: " ++ show response
                   Gtk.widgetDestroy fileChooser
+        mwUndoImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
+          do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
+             when (pageNum /= -1) $
+               do tabs <- readIORef tabsRef
+                  let gwb = tabs IntMap.! pageNum
+                  backGWB gwb
+                  --Gtk.widgetQueueDraw (gtDrawingArea gameTab)
         return ()
 
 main :: IO ()

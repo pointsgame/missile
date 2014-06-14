@@ -18,7 +18,8 @@ executable missile
                        Auxiliary,
                        Bot,
                        FileFormats.Common,
-                       GameWithBot
+                       GameWithBot,
+                       Rendering
   build-depends:       base,
                        array,
                        containers,

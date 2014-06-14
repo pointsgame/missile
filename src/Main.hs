@@ -18,6 +18,7 @@ import Settings
 import Game
 import GameWithBot
 import qualified FileFormats.XT as XT
+import Rendering
 import Auxiliary
 
 data MainWindow = MainWindow { mwWindow :: Gtk.Window,
@@ -54,7 +55,8 @@ data PreferencesDialog = PreferencesDialog { pdDialog :: Gtk.Dialog,
                                              pdWithComplexitySpinButton :: Gtk.SpinButton }
 
 data GameTab = GameTab { gtWidget :: Gtk.Widget,
-                         gtDrawingArea :: Gtk.DrawingArea }
+                         gtDrawingArea :: Gtk.DrawingArea,
+                         gtCoordLabel :: Gtk.Label }
 
 rgbToGtkColor :: RGB Double -> Gtk.Color
 rgbToGtkColor (Colour.RGB r g b) =
@@ -275,25 +277,14 @@ runPreferencesDialog startSettings preferencesDialog f =
 
 gameTabNew :: IO GameTab
 gameTabNew =
-  do drawingArea <- Gtk.drawingAreaNew
-     return GameTab { gtWidget = Gtk.toWidget drawingArea,
-                      gtDrawingArea = drawingArea }
-
-fromPos :: Bool -> Double -> Int -> Int -> Double
-fromPos reflection areaSize fieldSize x =
-  let cellSize = areaSize / fromIntegral fieldSize
-      x' = (fromIntegral x + 0.5) * cellSize
-  in if reflection
-     then areaSize - x'
-     else x'
-
-toPos :: Bool -> Double -> Int -> Double -> Int
-toPos reflection areaSize fieldSize x =
-  let cellSize = areaSize / fromIntegral fieldSize
-      x' = floor $ x / cellSize
-  in if reflection
-     then fieldSize - x' - 1
-     else x'
+  do table <- Gtk.tableNew 2 1 False
+     drawingArea <- Gtk.drawingAreaNew
+     coordLabel <- Gtk.labelNew Nothing
+     Gtk.tableAttachDefaults table drawingArea 0 1 0 1
+     Gtk.tableAttach table coordLabel 0 1 1 2 [] [] 1 1
+     return GameTab { gtWidget = Gtk.toWidget table,
+                      gtDrawingArea = drawingArea,
+                      gtCoordLabel = coordLabel }
 
 setSourceRGBA :: RGB Double -> Double -> Cairo.Render ()
 setSourceRGBA rgb = Cairo.setSourceRGBA (channelRed rgb) (channelGreen rgb) (channelBlue rgb)
@@ -318,9 +309,9 @@ draw game width height =
          shiftX = (width - width') / 2
          shiftY = (height - height') / 2
          settings = gameSettings game
-         fromPosX = (shiftX +) . fromPos (horizontalReflection settings) width' (fieldWidth headField)
-         fromPosY = (shiftY +) . fromPos (verticalReflection settings) height' (fieldHeight headField)
-         fromPos' (x, y) = (fromPosX x, fromPosY y)
+         fromPosX = fromGamePosX game width height
+         fromPosY = fromGamePosY game width height
+         fromPos = fromGamePos game width height
          verticalLines = [fromPosX i | i <- [0..(fieldWidth headField - 1)]]
          horizontalLines = [fromPosY i | i <- [0..(fieldHeight headField - 1)]]
      --Rendering background.
@@ -354,63 +345,60 @@ draw game width height =
      when (fullFill settings) $ mapM_ (\(field, (pos, player)) ->
        do if player == Red then setSourceRGBA (redColor settings) (fillingAlpha settings) else setSourceRGBA (blackColor settings) (fillingAlpha settings)
           if playersPoint field (s pos) player && playersPoint field (e pos) player
-            then polygon [fromPos' pos, fromPos' $ s pos, fromPos' $ e pos]
+            then polygon [fromPos pos, fromPos $ s pos, fromPos $ e pos]
             else do when (playersPoint field (s pos) player && playersPoint field (se pos) player) $
-                      polygon [fromPos' pos, fromPos' $ s pos, fromPos' $ se pos]
+                      polygon [fromPos pos, fromPos $ s pos, fromPos $ se pos]
                     when (playersPoint field (e pos) player && playersPoint field (se pos) player) $
-                      polygon [fromPos' pos, fromPos' $ e pos, fromPos' $ se pos]
+                      polygon [fromPos pos, fromPos $ e pos, fromPos $ se pos]
           if playersPoint field (e pos) player && playersPoint field (n pos) player
-            then polygon [fromPos' pos, fromPos' $ e pos, fromPos' $ n pos]
+            then polygon [fromPos pos, fromPos $ e pos, fromPos $ n pos]
             else do when (playersPoint field (e pos) player && playersPoint field (ne pos) player) $
-                      polygon [fromPos' pos, fromPos' $ e pos, fromPos' $ ne pos]
+                      polygon [fromPos pos, fromPos $ e pos, fromPos $ ne pos]
                     when (playersPoint field (n pos) player && playersPoint field (ne pos) player) $
-                      polygon [fromPos' pos, fromPos' $ n pos, fromPos' $ ne pos]
+                      polygon [fromPos pos, fromPos $ n pos, fromPos $ ne pos]
           if playersPoint field (n pos) player && playersPoint field (w pos) player
-            then polygon [fromPos' pos, fromPos' $ n pos, fromPos' $ w pos]
+            then polygon [fromPos pos, fromPos $ n pos, fromPos $ w pos]
             else do when (playersPoint field (n pos) player && playersPoint field (nw pos) player) $
-                      polygon [fromPos' pos, fromPos' $ n pos, fromPos' $ nw pos]
+                      polygon [fromPos pos, fromPos $ n pos, fromPos $ nw pos]
                     when (playersPoint field (w pos) player && playersPoint field (nw pos) player) $
-                      polygon [fromPos' pos, fromPos' $ w pos, fromPos' $ nw pos]
+                      polygon [fromPos pos, fromPos $ w pos, fromPos $ nw pos]
           if playersPoint field (w pos) player && playersPoint field (s pos) player
-            then polygon [fromPos' pos, fromPos' $ w pos, fromPos' $ s pos]
+            then polygon [fromPos pos, fromPos $ w pos, fromPos $ s pos]
             else do when (playersPoint field (w pos) player && playersPoint field (sw pos) player) $
-                      polygon [fromPos' pos, fromPos' $ w pos, fromPos' $ sw pos]
+                      polygon [fromPos pos, fromPos $ w pos, fromPos $ sw pos]
                     when (playersPoint field (s pos) player && playersPoint field (sw pos) player) $
-                      polygon [fromPos' pos, fromPos' $ s pos, fromPos' $ sw pos]) $ zip (reverse fields) (map (head . moves) $ tail $ reverse fields)
+                      polygon [fromPos pos, fromPos $ s pos, fromPos $ sw pos]) $ zip (reverse fields) (map (head . moves) $ tail $ reverse fields)
      --Rendering surrounds.
      mapM_ (\(chain, player) ->
        do if player == Red then setSourceRGBA (redColor settings) (fillingAlpha settings) else setSourceRGBA (blackColor settings) (fillingAlpha settings)
-          polygon $ map fromPos' chain) $ filter (not . null . fst) $ map lastSurroundChain $ reverse fields
+          polygon $ map fromPos chain) $ filter (not . null . fst) $ map lastSurroundChain $ reverse fields
 
 listenGameTab :: GameWithBot -> GameTab -> IO ()
 listenGameTab gwb gameTab =
-  do gtDrawingArea gameTab `Gtk.on` Gtk.draw $
+  do let withPos f =
+           do (x, y) <- Gtk.eventCoordinates
+              liftIO $ do game <- get (gwbGame gwb)
+                          width <- liftM fromIntegral $ liftIO $ Gtk.widgetGetAllocatedWidth $ gtDrawingArea gameTab
+                          height <- liftM fromIntegral $ liftIO $ Gtk.widgetGetAllocatedHeight $ gtDrawingArea gameTab
+                          let fields = gameFields game
+                              headField = head fields
+                              gameFieldWidth = fieldWidth headField
+                              gameFieldHeight = fieldHeight headField
+                              (posX, posY) = toGamePos game width height (x, y)
+                          when (posX >= 0 && posY >= 0 && posX < gameFieldWidth && posY < gameFieldHeight) $ f (posX, posY)
+     gtDrawingArea gameTab `Gtk.on` Gtk.draw $
        do game <- liftIO $ get (gwbGame gwb)
           width <- liftIO $ Gtk.widgetGetAllocatedWidth $ gtDrawingArea gameTab
           height <- liftIO $ Gtk.widgetGetAllocatedHeight $ gtDrawingArea gameTab
           draw game (fromIntegral width) (fromIntegral height)
      gtDrawingArea gameTab `Gtk.on` Gtk.buttonPressEvent $ Gtk.tryEvent $
         do Gtk.LeftButton <- Gtk.eventButton
-           (x, y) <- Gtk.eventCoordinates
-           liftIO $ do game <- get (gwbGame gwb)
-                       width <- liftM fromIntegral $ liftIO $ Gtk.widgetGetAllocatedWidth $ gtDrawingArea gameTab
-                       height <- liftM fromIntegral $ liftIO $ Gtk.widgetGetAllocatedHeight $ gtDrawingArea gameTab
-                       let fields = gameFields game
-                           headField = head fields
-                           gameFieldWidth = fromIntegral $ fieldWidth headField
-                           gameFieldHeight = fromIntegral $ fieldHeight headField
-                           width' = min width $ height / gameFieldHeight * gameFieldWidth
-                           height' = min height $ width / gameFieldWidth * gameFieldHeight
-                           shiftX = (width - width') / 2
-                           shiftY = (height - height') / 2
-                           settings = gameSettings game
-                           x' = x - shiftX
-                           y' = y - shiftY
-                           posX = toPos (horizontalReflection settings) width' (fieldWidth headField) x'
-                           posY = toPos (verticalReflection settings) height' (fieldHeight headField) y'
-                           pos = (posX, posY)
-                       putGWBPoint pos gwb
-                       Gtk.widgetQueueDraw $ gtDrawingArea gameTab
+           withPos $ \pos -> do putGWBPoint pos gwb
+                                Gtk.widgetQueueDraw $ gtDrawingArea gameTab
+     Gtk.widgetAddEvents (gtDrawingArea gameTab) [Gtk.PointerMotionMask]
+     gtDrawingArea gameTab `Gtk.on` Gtk.motionNotifyEvent $
+       do withPos $ \(posX, posY) -> Gtk.labelSetText (gtCoordLabel gameTab) $ show (posX + 1) ++ ":" ++ show (posY + 1)
+          return False
      return ()
 
 mainWindowNew :: Gtk.Pixbuf -> IO MainWindow

@@ -13,6 +13,18 @@ data Game = Game { curPlayer :: Player,
                    gameTree :: Tree Field,
                    gameSettings :: Settings }
 
+mapGameTreeMoves :: Tree Field -> (Pos -> Pos) -> Tree Field
+mapGameTreeMoves (Node field children) f = Node field (map (\child -> mapGameTreeMoves' child field) children) where
+  mapGameTreeMoves' (Node field' children') lastField =
+    let (pos, player) = head $ moves field'
+        newField = putPoint (f pos) player lastField
+    in Node newField $ map (\child -> mapGameTreeMoves' child newField) children'
+
+selectFields :: Tree Field -> [(Pos, Player)] -> [Field]
+selectFields (Node field _) [] = [field]
+selectFields (Node field children) (h : t) =
+  field : selectFields (fromJust $ find (\(Node childField _) -> head (moves childField) == h) children) t
+
 emptyGame :: Settings -> Game
 emptyGame settings =
   let field = emptyField (gameWidth settings) (gameHeight settings)
@@ -46,6 +58,22 @@ backGame :: Game -> Game
 backGame game =
   game { curPlayer = snd $ head $ moves $ head $ gameFields game,
          gameFields = tail $ gameFields game }
+
+reflectHorizontallyGame :: Game -> Game
+reflectHorizontallyGame game =
+  let width = fieldWidth $ rootLabel $ gameTree game
+      f (posX, posY) = (width - posX - 1, posY)
+      newTree = mapGameTreeMoves (gameTree game) f
+  in game { gameFields = reverse $ selectFields newTree $ map (\(pos, player) -> (f pos, player)) $ reverse $ moves $ head $ gameFields game,
+            gameTree = newTree }
+
+reflectVerticallyGame :: Game -> Game
+reflectVerticallyGame game =
+  let height = fieldHeight $ rootLabel $ gameTree game
+      f (posX, posY) = (posX, height - posY - 1)
+      newTree = mapGameTreeMoves (gameTree game) f
+  in game { gameFields = reverse $ selectFields newTree $ map (\(pos, player) -> (f pos, player)) $ reverse $ moves $ head $ gameFields game,
+            gameTree = newTree }
 
 updateGameSettings' :: Settings -> Settings -> Settings
 updateGameSettings' oldSettings newSettings =

@@ -125,6 +125,22 @@ backGWB gwb =
                             do gwbBusy gwb $= False
                                gwbUpdated gwb
 
+reflectHorizontallyGWB :: GameWithBot -> IO ()
+reflectHorizontallyGWB gwb =
+    do busy <- get (gwbBusy gwb)
+       unless busy $
+         do game <- get (gwbGame gwb)
+            gwbGame gwb $= reflectHorizontallyGame game
+            reloadGWBBot gwb
+
+reflectVerticallyGWB :: GameWithBot -> IO ()
+reflectVerticallyGWB gwb =
+    do busy <- get (gwbBusy gwb)
+       unless busy $
+         do game <- get (gwbGame gwb)
+            gwbGame gwb $= reflectVerticallyGame game
+            reloadGWBBot gwb
+
 updateGWBSettings :: GameWithBot -> Settings -> IO ()
 updateGWBSettings gwb settings =
     do game <- get (gwbGame gwb)

@@ -28,6 +28,8 @@ data MainWindow = MainWindow { mwWindow :: Gtk.Window,
                                mwCloseImageMenuItem :: Gtk.ImageMenuItem,
                                mwQuitImageMenuItem :: Gtk.ImageMenuItem,
                                mwUndoImageMenuItem :: Gtk.ImageMenuItem,
+                               mwReflectHorizontallyMenuItem :: Gtk.MenuItem,
+                               mwReflectVerticallyMenuItem :: Gtk.MenuItem,
                                mwPreferencesImageMenuItem :: Gtk.ImageMenuItem,
                                mwAboutImageMenuItem :: Gtk.ImageMenuItem,
                                mwNotebook :: Gtk.Notebook }
@@ -418,6 +420,8 @@ mainWindowNew logo =
      editImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockEdit
      editMenu <- Gtk.menuNew
      undoImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockUndo
+     reflectHorizontallyMenuItem <- Gtk.menuItemNewWithLabel "Reflect horizontally"
+     reflectVerticallyMenuItem <- Gtk.menuItemNewWithLabel "Reflect vertically"
      editSeparatorMenuItem <- Gtk.separatorMenuItemNew
      preferencesImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockPreferences
      helpImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockHelp
@@ -443,6 +447,8 @@ mainWindowNew logo =
      Gtk.containerAdd menuBar editImageMenuItem
      editImageMenuItem `Gtk.set` [Gtk.menuItemSubmenu := editMenu]
      Gtk.containerAdd editMenu undoImageMenuItem
+     Gtk.containerAdd editMenu reflectHorizontallyMenuItem
+     Gtk.containerAdd editMenu reflectVerticallyMenuItem
      Gtk.containerAdd editMenu editSeparatorMenuItem
      Gtk.containerAdd editMenu preferencesImageMenuItem
      Gtk.containerAdd menuBar helpImageMenuItem
@@ -457,6 +463,8 @@ mainWindowNew logo =
                          mwCloseImageMenuItem = closeImageMenuItem,
                          mwQuitImageMenuItem = quitImageMenuItem,
                          mwUndoImageMenuItem = undoImageMenuItem,
+                         mwReflectHorizontallyMenuItem = reflectHorizontallyMenuItem,
+                         mwReflectVerticallyMenuItem = reflectVerticallyMenuItem,
                          mwPreferencesImageMenuItem = preferencesImageMenuItem,
                          mwAboutImageMenuItem = aboutImageMenuItem,
                          mwNotebook = notebook }
@@ -507,6 +515,20 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
                do tabs <- get tabsRef
                   let (gameTab, gwb) = tabs IntMap.! pageNum
                   backGWB gwb
+                  Gtk.widgetQueueDraw $ gtDrawingArea gameTab
+        mwReflectHorizontallyMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
+          do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
+             when (pageNum /= -1) $
+               do tabs <- get tabsRef
+                  let (gameTab, gwb) = tabs IntMap.! pageNum
+                  reflectHorizontallyGWB gwb
+                  Gtk.widgetQueueDraw $ gtDrawingArea gameTab
+        mwReflectVerticallyMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
+          do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
+             when (pageNum /= -1) $
+               do tabs <- get tabsRef
+                  let (gameTab, gwb) = tabs IntMap.! pageNum
+                  reflectVerticallyGWB gwb
                   Gtk.widgetQueueDraw $ gtDrawingArea gameTab
         mwOpenImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mwWindow mainWindow)) Gtk.FileChooserActionOpen [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]

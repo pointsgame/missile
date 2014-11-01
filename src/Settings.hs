@@ -22,7 +22,6 @@ data Settings = Settings { gameWidth :: Int,
                            gridColor :: RGB Double,
                            fillingAlpha :: Double,
                            pointRadius :: Double,
-                           pointDetailling :: Int,
                            horizontalReflection :: Bool,
                            verticalReflection :: Bool,
                            fullFill :: Bool,
@@ -44,7 +43,6 @@ defaultSettings = Settings { gameWidth = 39,
                              gridColor = RGB 0.3 0.3 0.3,
                              fillingAlpha = 0.5,
                              pointRadius = 1,
-                             pointDetailling = 16,
                              horizontalReflection = False,
                              verticalReflection = False,
                              fullFill = True,
@@ -75,7 +73,6 @@ readSettings fileName = do fileExist <- doesFileExist fileName
                                               gridColorConf = get cfg "Other" "grid_color"
                                               fillingAlphaConf = get cfg "Other" "filling_alpha"
                                               pointRadiusConf = get cfg "Other" "point_radius"
-                                              pointDetaillingConf = get cfg "Other" "point_detailling"
                                               horizontalReflectionConf = get cfg "Other" "horizontal_reflection"
                                               verticalReflectionConf = get cfg "Other" "vertical_reflection"
                                               fullFillConf = get cfg "Other" "full_fill"
@@ -117,9 +114,6 @@ readSettings fileName = do fileExist <- doesFileExist fileName
                                                         pointRadius = case pointRadiusConf of
                                                                         Left _    -> pointRadius defaultSettings
                                                                         Right val -> val,
-                                                        pointDetailling = case pointDetaillingConf of
-                                                                            Left _    -> pointDetailling defaultSettings
-                                                                            Right int -> int,
                                                         horizontalReflection = case horizontalReflectionConf of
                                                                                  Left _    -> horizontalReflection defaultSettings
                                                                                  Right val -> val,
@@ -162,14 +156,13 @@ writeSettings settings fileName = let cfgStr = forceEither $ do let cfg = emptyC
                                                                 cfg13 <- set cfg12 "Other" "grid_color" (sRGB24show $ uncurryRGB sRGB $ gridColor settings)
                                                                 cfg14 <- setshow cfg13 "Other" "filling_alpha" (fillingAlpha settings)
                                                                 cfg15 <- setshow cfg14 "Other" "point_radius" (pointRadius settings)
-                                                                cfg16 <- setshow cfg15 "Other" "point_detailling" (pointDetailling settings)
-                                                                cfg17 <- setshow cfg16 "Other" "horizontal_reflection" (horizontalReflection settings)
-                                                                cfg18 <- setshow cfg17 "Other" "vertical_reflection" (verticalReflection settings)
-                                                                cfg19 <- setshow cfg18 "Other" "full_fill" (fullFill settings)
-                                                                cfg20 <- setshow cfg19 "Other" "grid_thickness" (gridThickness settings)
-                                                                cfg21 <- setshow cfg20 "AI" "ai_present" (aiPresent settings)
-                                                                cfg22 <- set cfg21 "AI" "ai_path" (aiPath settings)
-                                                                cfg23 <- setshow cfg22 "AI" "ai_respondent" (aiRespondent settings)
-                                                                cfg24 <- setshow cfg23 "AI" "ai_gen_move_type" (aiGenMoveType settings)
-                                                                return $ to_string cfg24
+                                                                cfg16 <- setshow cfg15 "Other" "horizontal_reflection" (horizontalReflection settings)
+                                                                cfg17 <- setshow cfg16 "Other" "vertical_reflection" (verticalReflection settings)
+                                                                cfg18 <- setshow cfg17 "Other" "full_fill" (fullFill settings)
+                                                                cfg19 <- setshow cfg18 "Other" "grid_thickness" (gridThickness settings)
+                                                                cfg20 <- setshow cfg19 "AI" "ai_present" (aiPresent settings)
+                                                                cfg21 <- set cfg20 "AI" "ai_path" (aiPath settings)
+                                                                cfg22 <- setshow cfg21 "AI" "ai_respondent" (aiRespondent settings)
+                                                                cfg23 <- setshow cfg22 "AI" "ai_gen_move_type" (aiGenMoveType settings)
+                                                                return $ to_string cfg23
                                   in writeFile fileName cfgStr

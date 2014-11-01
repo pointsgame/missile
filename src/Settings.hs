@@ -46,9 +46,9 @@ defaultSettings = Settings { gameWidth = 39,
                              horizontalReflection = False,
                              verticalReflection = False,
                              fullFill = True,
-                             gridThickness = 2,
+                             gridThickness = 1,
                              aiPresent = False,
-                             aiPath = "./ai",
+                             aiPath = "./opai",
                              aiRespondent = True,
                              aiGenMoveType = Simple }
 

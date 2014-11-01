@@ -281,7 +281,7 @@ gameTabNew :: IO GameTab
 gameTabNew =
   do table <- Gtk.tableNew 2 1 False
      drawingArea <- Gtk.drawingAreaNew
-     coordLabel <- Gtk.labelNew Nothing
+     coordLabel <- Gtk.labelNew (Nothing :: Maybe [Char])
      Gtk.tableAttachDefaults table drawingArea 0 1 0 1
      Gtk.tableAttach table coordLabel 0 1 1 2 [] [] 1 1
      return GameTab { gtWidget = Gtk.toWidget table,

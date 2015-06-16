@@ -33,3 +33,19 @@ padRight c n s | length s >= n = s
 toTreeInv :: [a] -> Tree a
 toTreeInv [] = error "toTreeInv: empty list."
 toTreeInv (h : t) = foldl (\tree h' -> Node h' [tree]) (Node h []) t
+
+fst' :: (a1, a2, a3) -> a1
+fst' (a, _, _) = a
+snd' :: (a1, a2, a3) -> a2
+snd' (_, a, _) = a
+thd' :: (a1, a2, a3) -> a3
+thd' (_, _, a) = a
+
+fst'' :: (a1, a2, a3, a4) -> a1
+fst'' (a, _, _, _) = a
+snd'' :: (a1, a2, a3, a4) -> a2
+snd'' (_, a, _, _) = a
+thd'' :: (a1, a2, a3, a4) -> a3
+thd'' (_, _, a, _) = a
+fth'' :: (a1, a2, a3, a4) -> a4
+fth'' (_, _, _, a) = a

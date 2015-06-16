@@ -100,14 +100,14 @@ putGWBPlayersPoint :: Pos -> Player -> GameWithBot -> IO ()
 putGWBPlayersPoint pos player gwb =
     do busy <- get (gwbBusy gwb)
        game <- get (gwbGame gwb)
-       unless (busy || not (puttingAllow (head $ gameFields game) pos)) $
+       unless (busy || not (isPuttingAllowed (head $ gameFields game) pos)) $
          putGWBPlayersPoint' game pos player gwb
 
 putGWBPoint :: Pos -> GameWithBot -> IO ()
 putGWBPoint pos gwb =
     do busy <- get (gwbBusy gwb)
        game <- get (gwbGame gwb)
-       unless (busy || not (puttingAllow (head $ gameFields game) pos)) $
+       unless (busy || not (isPuttingAllowed (head $ gameFields game) pos)) $
          putGWBPlayersPoint' game pos (curPlayer game) gwb
 
 backGWB :: GameWithBot -> IO ()

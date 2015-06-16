@@ -346,34 +346,34 @@ draw game width height =
      Cairo.setAntialias Cairo.AntialiasNone
      when (fullFill settings) $ mapM_ (\(field, (pos, player)) ->
        do if player == Red then setSourceRGBA (redColor settings) (fillingAlpha settings) else setSourceRGBA (blackColor settings) (fillingAlpha settings)
-          if playersPoint field (s pos) player && playersPoint field (e pos) player
+          if isPlayer field (s pos) player && isPlayer field (e pos) player
             then polygon [fromPos pos, fromPos $ s pos, fromPos $ e pos]
-            else do when (playersPoint field (s pos) player && playersPoint field (se pos) player) $
+            else do when (isPlayer field (s pos) player && isPlayer field (se pos) player) $
                       polygon [fromPos pos, fromPos $ s pos, fromPos $ se pos]
-                    when (playersPoint field (e pos) player && playersPoint field (se pos) player) $
+                    when (isPlayer field (e pos) player && isPlayer field (se pos) player) $
                       polygon [fromPos pos, fromPos $ e pos, fromPos $ se pos]
-          if playersPoint field (e pos) player && playersPoint field (n pos) player
+          if isPlayer field (e pos) player && isPlayer field (n pos) player
             then polygon [fromPos pos, fromPos $ e pos, fromPos $ n pos]
-            else do when (playersPoint field (e pos) player && playersPoint field (ne pos) player) $
+            else do when (isPlayer field (e pos) player && isPlayer field (ne pos) player) $
                       polygon [fromPos pos, fromPos $ e pos, fromPos $ ne pos]
-                    when (playersPoint field (n pos) player && playersPoint field (ne pos) player) $
+                    when (isPlayer field (n pos) player && isPlayer field (ne pos) player) $
                       polygon [fromPos pos, fromPos $ n pos, fromPos $ ne pos]
-          if playersPoint field (n pos) player && playersPoint field (w pos) player
+          if isPlayer field (n pos) player && isPlayer field (w pos) player
             then polygon [fromPos pos, fromPos $ n pos, fromPos $ w pos]
-            else do when (playersPoint field (n pos) player && playersPoint field (nw pos) player) $
+            else do when (isPlayer field (n pos) player && isPlayer field (nw pos) player) $
                       polygon [fromPos pos, fromPos $ n pos, fromPos $ nw pos]
-                    when (playersPoint field (w pos) player && playersPoint field (nw pos) player) $
+                    when (isPlayer field (w pos) player && isPlayer field (nw pos) player) $
                       polygon [fromPos pos, fromPos $ w pos, fromPos $ nw pos]
-          if playersPoint field (w pos) player && playersPoint field (s pos) player
+          if isPlayer field (w pos) player && isPlayer field (s pos) player
             then polygon [fromPos pos, fromPos $ w pos, fromPos $ s pos]
-            else do when (playersPoint field (w pos) player && playersPoint field (sw pos) player) $
+            else do when (isPlayer field (w pos) player && isPlayer field (sw pos) player) $
                       polygon [fromPos pos, fromPos $ w pos, fromPos $ sw pos]
-                    when (playersPoint field (s pos) player && playersPoint field (sw pos) player) $
+                    when (isPlayer field (s pos) player && isPlayer field (sw pos) player) $
                       polygon [fromPos pos, fromPos $ s pos, fromPos $ sw pos]) $ zip (reverse fields) (map (head . moves) $ tail $ reverse fields)
      --Rendering surrounds.
      mapM_ (\(chain, player) ->
        do if player == Red then setSourceRGBA (redColor settings) (fillingAlpha settings) else setSourceRGBA (blackColor settings) (fillingAlpha settings)
-          polygon $ map fromPos chain) $ filter (not . null . fst) $ map lastSurroundChain $ reverse fields
+          polygon $ map fromPos chain) $ catMaybes $ map lastSurroundChain $ reverse fields
 
 listenGameTab :: GameWithBot -> GameTab -> IO ()
 listenGameTab gwb gameTab =

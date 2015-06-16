@@ -7,6 +7,8 @@ import qualified Data.Set as S
 import Auxiliary
 import Player
 
+--TODO: объединение тректорий захвата.
+
 type Pos = (Int, Int)
 
 n :: Pos -> Pos
@@ -33,58 +35,62 @@ sw (x, y) = (x - 1, y - 1)
 se :: Pos -> Pos
 se (x, y) = (x + 1, y - 1)
 
-type Point = Maybe Player
+data Point = EmptyPoint |
+             PlayerPoint Player |
+             BasePoint Player Bool |
+             EmptyBasePoint Player
+  deriving (Eq, Show, Read)
 
 data Field = Field { scoreRed :: Int,
                      scoreBlack :: Int,
                      moves :: [(Pos, Player)],
-                     lastSurroundChain :: ([Pos], Player),
-                     points :: Array Pos Point,
-                     redEmptyBasePoints :: S.Set Pos,
-                     blackEmptyBasePoints :: S.Set Pos }
+                     lastSurroundChain :: Maybe ([Pos], Player),
+                     points :: Array Pos Point }
 
-inField :: Field -> Pos -> Bool
-inField field = inRange (bounds (points field))
+isInField :: Field -> Pos -> Bool
+isInField field = inRange (bounds (points field))
 
-puttingAllow :: Field -> Pos -> Bool
-puttingAllow field pos | not $ inField field pos = False
-                       | isJust $ points field ! pos = False
-                       | otherwise = True
+isPuttingAllowed :: Field -> Pos -> Bool
+isPuttingAllowed field pos | not $ isInField field pos = False
+                           | otherwise =
+  case points field ! pos of
+    EmptyPoint       -> True
+    EmptyBasePoint _ -> True
+    _                -> False
 
-playersPoint :: Field -> Pos -> Player -> Bool
-playersPoint field pos player | not $ inField field pos = False
-                              | points field ! pos /= Just player = False
-                              | otherwise = True
+isPlayer :: Field -> Pos -> Player -> Bool
+isPlayer field pos player | not $ isInField field pos = False
+                          | otherwise =
+  case points field ! pos of
+    PlayerPoint player' -> player' == player
+    BasePoint player' _ -> player' == player
+    _                   -> False
 
-wave :: Field -> Pos -> (Pos -> Bool) -> [Pos]
+isPlayersPoint :: Field -> Pos -> Player -> Bool
+isPlayersPoint field pos player | not $ isInField field pos = False
+                                | otherwise = points field ! pos == PlayerPoint player
+
+isCapturedPoint :: Field -> Pos -> Player -> Bool
+isCapturedPoint field pos player | not $ isInField field pos = False
+                                 | otherwise = points field ! pos == BasePoint (nextPlayer player) True
+
+isEmptyBase :: Field -> Pos -> Player -> Bool
+isEmptyBase field pos player | not $ isInField field pos = False
+                             | otherwise = points field ! pos == EmptyBasePoint player
+
+wave :: Field -> Pos -> (Pos -> Bool) -> S.Set Pos
 wave field startPos f = wave' S.empty (S.singleton startPos)
-  where wave' passed front | S.null front = S.elems passed
+  where wave' passed front | S.null front = passed
                            | otherwise = wave' (S.union passed front) (nextFront passed front)
-        nextFront passed front = S.filter f $ S.fromList (filter (inField field) $ concatMap neighborhood $ S.elems front) S.\\ passed
+        nextFront passed front = S.filter f $ S.fromList (filter (isInField field) $ concatMap neighborhood $ S.elems front) S.\\ passed
         neighborhood pos = [n pos, s pos, w pos, e pos]
-
-{--
-wave :: Field -> Pos -> (Pos -> Point -> Bool) -> [Pos]
-wave field startPos f = wave' startPos [] where
-                         wave' pos list | not $ inField field pos = list
-                                        | elem pos list = list
-                                        | not (f pos ((points field) ! pos)) = list
-                                        | otherwise = let list1 = pos : list
-                                                          list2 = wave' (e pos) list1
-                                                          list3 = wave' (n pos) list2
-                                                          list4 = wave' (w pos) list3
-                                                          list5 = wave' (s pos) list4
-                                                      in list5
---}
 
 emptyField :: Int -> Int -> Field
 emptyField width height = Field { scoreRed = 0,
                                   scoreBlack = 0,
                                   moves = [],
-                                  lastSurroundChain = ([], Black),
-                                  points = listArray ((0, 0), (width - 1, height - 1)) (repeat Nothing),
-                                  redEmptyBasePoints = S.empty,
-                                  blackEmptyBasePoints = S.empty }
+                                  lastSurroundChain = Nothing,
+                                  points = listArray ((0, 0), (width - 1, height - 1)) (repeat EmptyPoint) }
 
 getFirstNextPos :: Pos -> Pos -> Pos
 getFirstNextPos centerPos pos =
@@ -130,44 +136,36 @@ buildChain field startPos nextPos player = if length chain > 2 && square chain >
   where chain = getChain startPos [nextPos, startPos]
         getChain start list@(h:_) = let nextPos' = getNextPlayerPos h (getFirstNextPos h start)
                                     in if | nextPos' == startPos -> list
-                                          | elem nextPos' list   -> getChain h (cut list nextPos')
-                                          | otherwise            -> getChain h (nextPos' : list)
+                                          | elem nextPos' list   -> getChain h $ dropWhile (/= nextPos') list
+                                          | otherwise            -> getChain h $ nextPos' : list
         getChain _ _ = error "buildChain: bug."
         getNextPlayerPos centerPos pos | pos == startPos = pos
-                                       | playersPoint field pos player = pos
+                                       | isPlayer field pos player = pos
                                        | otherwise = getNextPlayerPos centerPos (getNextPos centerPos pos)
-        cut list@(h:t) pos | h == pos = list
-                           | otherwise = cut t pos
-        cut _ _ = error "buildChain: bug."
-
-getEmptyBaseColor :: Field -> Pos -> Maybe Player
-getEmptyBaseColor field pos | S.member pos (redEmptyBasePoints field) = Just Red
-                            | S.member pos (blackEmptyBasePoints field) = Just Black
-                            | otherwise = Nothing
 
 getInputPoints :: Field -> Pos -> Player -> [(Pos, Pos)]
 getInputPoints field pos player =
-  let list1 = if not $ playersPoint field (w pos) player then
-                if | playersPoint field (sw pos) player -> [(sw pos, w pos)]
-                   | playersPoint field (s pos) player  -> [(s pos, w pos)]
+  let list1 = if not $ isPlayer field (w pos) player then
+                if | isPlayer field (sw pos) player -> [(sw pos, w pos)]
+                   | isPlayer field (s pos) player  -> [(s pos, w pos)]
                    | otherwise                          -> []
               else
                 []
-      list2 = if not $ playersPoint field (n pos) player then
-                if | playersPoint field (nw pos) player -> (nw pos, n pos) : list1
-                   | playersPoint field (w pos) player  -> (w pos, n pos) : list1
+      list2 = if not $ isPlayer field (n pos) player then
+                if | isPlayer field (nw pos) player -> (nw pos, n pos) : list1
+                   | isPlayer field (w pos) player  -> (w pos, n pos) : list1
                    | otherwise                          -> list1
               else
                 list1
-      list3 = if not $ playersPoint field (e pos) player then
-                if | playersPoint field (ne pos) player -> (ne pos, e pos) : list2
-                   | playersPoint field (n pos) player  -> (n pos, e pos) : list2
+      list3 = if not $ isPlayer field (e pos) player then
+                if | isPlayer field (ne pos) player -> (ne pos, e pos) : list2
+                   | isPlayer field (n pos) player  -> (n pos, e pos) : list2
                    | otherwise                          -> list2
               else
                 list2
-      list4 = if not $ playersPoint field (s pos) player then
-                if | playersPoint field (se pos) player -> (se pos, s pos) : list3
-                   | playersPoint field (e pos) player  -> (e pos, s pos) : list3
+      list4 = if not $ isPlayer field (s pos) player then
+                if | isPlayer field (se pos) player -> (se pos, s pos) : list3
+                   | isPlayer field (e pos) player  -> (e pos, s pos) : list3
                    | otherwise                          -> list3
               else
                 list3
@@ -181,69 +179,78 @@ posInsideRing (x, y) ring =
              | otherwise       = ring'
   in odd $ count (\(a, b, c) -> b == y && ((a < b && c > b) || (a > b && c < b))) $ zip3 ring'' (tail ring'') (tail $ tail ring'')
 
-getInsideRing :: Field -> Pos -> [Pos] -> [Pos]
+getInsideRing :: Field -> Pos -> [Pos] -> S.Set Pos
 getInsideRing field startPos ring =
   let ringSet = S.fromList ring
   in wave field startPos $ flip S.notMember ringSet
 
 getEmptyBase :: Field -> Pos -> Player -> ([Pos], [Pos])
-getEmptyBase field startPos player = (emptyBaseChain, filter (isNothing . (points field !)) $ getInsideRing field startPos emptyBaseChain)
+getEmptyBase field startPos player = (emptyBaseChain, filter (\pos -> isEmptyBase field pos player) $ S.elems $ getInsideRing field startPos emptyBaseChain)
   where emptyBaseChain = getEmptyBaseChain (w startPos)
-        getEmptyBaseChain pos | not $ playersPoint field pos player = getEmptyBaseChain (w pos)
+        getEmptyBaseChain pos | not $ isPlayer field pos player = getEmptyBaseChain (w pos)
                               | otherwise = let inputPoints = getInputPoints field pos player
                                                 chains = mapMaybe (\(chainPos, _) -> buildChain field pos chainPos player) inputPoints
                                                 result = find (posInsideRing startPos) chains
                                             in fromMaybe (getEmptyBaseChain (w pos)) result
 
-fst' :: (a1, a2, a3) -> a1
-fst' (a, _, _) = a
-snd' :: (a1, a2, a3) -> a2
-snd' (_, a, _) = a
-thd' :: (a1, a2, a3) -> a3
-thd' (_, _, a) = a
+capture :: Point -> Player -> Point
+capture point player =
+  case point of
+    EmptyPoint                                  -> BasePoint player False
+    PlayerPoint player' | player' == player     -> PlayerPoint player'
+                        | otherwise             -> BasePoint player True
+    BasePoint player' enemy | player' == player -> BasePoint player' enemy
+                            | enemy             -> PlayerPoint player
+                            | otherwise         -> BasePoint player False
+    EmptyBasePoint _                            -> BasePoint player False
 
 putPoint :: Pos -> Player -> Field -> Field
-putPoint pos player field | not (puttingAllow field pos) = error "putPos: putting in the pos is not allowed."
+putPoint pos player field | not (isPuttingAllowed field pos) = error "putPos: putting in the pos is not allowed."
                           | otherwise = let enemyPlayer = nextPlayer player
-                                            inEnemyEmptyBase = (player == Black && S.member pos (redEmptyBasePoints field)) || (player == Red && S.member pos (blackEmptyBasePoints field))
-                                            inCurEmptyBase = (player == Red && S.member pos (redEmptyBasePoints field)) || (player == Black && S.member pos (blackEmptyBasePoints field))
-                                            (enemyEmptyBaseChain, enemyEmptyBase) = getEmptyBase field pos (nextPlayer player)
+                                            point = points field ! pos
+                                            (enemyEmptyBaseChain, enemyEmptyBase) = getEmptyBase field pos enemyPlayer
                                             inputPoints = getInputPoints field pos player
                                             captures = mapMaybe (\(chainPos, capturedPos) ->
                                               do chain <- buildChain field pos chainPos player
-                                                 let captured = getInsideRing field capturedPos chain
-                                                     capturedCount = count (\pos' -> playersPoint field pos' enemyPlayer) captured
-                                                 return (chain, captured, capturedCount)) inputPoints
-                                            headCaptures = head captures
-                                            deltaScore = sum $ map thd' captures
-                                            newEmptyBase = concatMap snd' $ filter ((== 0) . thd') captures
-                                            realCaptured = concatMap snd' $ filter ((/= 0) . thd') captures
-                                            captureChain = concatMap (reverse . fst') $ filter ((/= 0) . thd') captures
-                                        in if inEnemyEmptyBase
+                                                 let captured = S.elems $ getInsideRing field capturedPos chain
+                                                     capturedCount' = count (\pos' -> isPlayersPoint field pos' enemyPlayer) captured
+                                                     freedCount' = count (\pos' -> isCapturedPoint field pos' player) captured
+                                                 return (chain, captured, capturedCount', freedCount')) inputPoints
+                                            (realCaptures, emptyCaptures) = partition ((/= 0) . thd'') captures
+                                            capturedCount = sum $ map thd'' realCaptures
+                                            freedCount = sum $ map fth'' realCaptures
+                                            newEmptyBase = concatMap snd'' emptyCaptures
+                                            realCaptured = concatMap snd'' realCaptures
+                                            captureChain = concatMap (reverse . fst'') realCaptures
+                                            newScoreRed = if player == Red then scoreRed field + capturedCount else scoreRed field - freedCount
+                                            newScoreBlack = if player == Black then scoreBlack field + capturedCount else scoreBlack field - freedCount
+                                            newMoves = (pos, player) : moves field
+                                        in if point == EmptyBasePoint enemyPlayer
                                            then if not $ null captures
-                                                then Field { scoreRed = if player == Red then scoreRed field + thd' headCaptures else scoreRed field,
-                                                             scoreBlack = if player == Black then scoreBlack field + thd' headCaptures else scoreBlack field,
-                                                             moves = (pos, player) : moves field,
-                                                             lastSurroundChain = (fst' headCaptures, player),
-                                                             points = points field // ((pos, Just player) : zip (snd' headCaptures) (repeat (Just player))),
-                                                             redEmptyBasePoints = if player == Red then redEmptyBasePoints field else redEmptyBasePoints field S.\\ S.fromList enemyEmptyBase,
-                                                             blackEmptyBasePoints = if player == Black then blackEmptyBasePoints field else blackEmptyBasePoints field S.\\ S.fromList enemyEmptyBase }
-                                                else field { scoreRed = if player == Red then scoreRed field - 1 else scoreRed field,
-                                                             scoreBlack = if player == Black then scoreBlack field - 1 else scoreBlack field,
-                                                             moves = (pos, player) : moves field,
-                                                             lastSurroundChain = (enemyEmptyBaseChain, enemyPlayer),
-                                                             points = points field // zip enemyEmptyBase (repeat (Just enemyPlayer)) }
-                                           else if inCurEmptyBase
-                                           then field { moves = (pos, player) : moves field,
-                                                        lastSurroundChain = ([], player),
-                                                        points = points field // [(pos, Just player)] }
-                                           else Field { scoreRed = if player == Red then scoreRed field + deltaScore else scoreRed field,
-                                                        scoreBlack = if player == Black then scoreBlack field + deltaScore else scoreBlack field,
-                                                        moves = (pos, player) : moves field,
-                                                        lastSurroundChain = (captureChain, player),
-                                                        points = points field // ((pos, Just player) : zip realCaptured (repeat (Just player))),
-                                                        redEmptyBasePoints = if player == Red then redEmptyBasePoints field `S.union` S.fromList newEmptyBase else redEmptyBasePoints field,
-                                                        blackEmptyBasePoints = if player == Black then blackEmptyBasePoints field `S.union` S.fromList newEmptyBase else blackEmptyBasePoints field } --fix
+                                                then Field { scoreRed = newScoreRed,
+                                                             scoreBlack = newScoreBlack,
+                                                             moves = newMoves,
+                                                             lastSurroundChain = Just (captureChain, player),
+                                                             points = points field // (zip enemyEmptyBase (repeat EmptyPoint) ++
+                                                                                       (pos, PlayerPoint player) :
+                                                                                       map (\pos' -> (pos', capture (points field ! pos') player)) realCaptured) }
+                                                else Field { scoreRed = if player == Red then scoreRed field else scoreRed field + 1,
+                                                             scoreBlack = if player == Black then scoreBlack field else scoreBlack field + 1,
+                                                             moves = newMoves,
+                                                             lastSurroundChain = Just (enemyEmptyBaseChain, enemyPlayer),
+                                                             points = points field // (zip enemyEmptyBase (repeat $ BasePoint enemyPlayer False) ++
+                                                                                       [(pos, BasePoint enemyPlayer True)]) }
+                                           else if point == EmptyBasePoint player
+                                           then field { moves = newMoves,
+                                                        lastSurroundChain = Nothing,
+                                                        points = points field // [(pos, PlayerPoint player)] }
+                                           else Field { scoreRed = newScoreRed,
+                                                        scoreBlack = newScoreBlack,
+                                                        moves = newMoves,
+                                                        lastSurroundChain = if null captureChain then Nothing else Just (captureChain, player),
+                                                        points = points field // ((pos, PlayerPoint player) :
+                                                                                  zip newEmptyBase (repeat $ EmptyBasePoint player) ++
+                                                                                  map (\pos' -> (pos', capture (points field ! pos') player)) realCaptured) }
 
 fieldWidth :: Field -> Int
 fieldWidth field =

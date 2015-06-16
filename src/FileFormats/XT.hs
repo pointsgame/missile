@@ -41,7 +41,7 @@ load' byteString settings =
                                                      | BS.index bs 3 == 0xFF = Just Red
                                                      | otherwise = Nothing
                                               nextFields = putPoint pos (fromJust player) (head fields') : fields'
-                                          in if puttingAllow (head fields') pos && isJust player
+                                          in if isPuttingAllowed (head fields') pos && isJust player
                                              then load'' (BS.drop 13 bs) nextFields
                                              else fields'
 

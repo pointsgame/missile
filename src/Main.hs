@@ -601,7 +601,8 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
                          globalSettingsRef $= newSettings
         mwAboutImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do aboutDialog <- Gtk.aboutDialogNew
-             aboutDialog `Gtk.set` [ Gtk.aboutDialogProgramName := "Missile",
+             aboutDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow,
+                                     Gtk.aboutDialogProgramName := "Missile",
                                      Gtk.aboutDialogVersion := "3.0.0",
                                      Gtk.aboutDialogLicense := Just license,
                                      Gtk.aboutDialogWebsite := "https://gitlab.com/points/missile",

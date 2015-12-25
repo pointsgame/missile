@@ -110,8 +110,8 @@ getSettings startSettings preferencesDialog =
                                                | curWithComplexity -> WithComplexity curComplexity
                                                | otherwise         -> error "Type of move generation not specified!" }
 
-preferencesDialogNew :: Settings -> IO PreferencesDialog
-preferencesDialogNew startSettings =
+preferencesDialogNew :: MainWindow -> Settings -> IO PreferencesDialog
+preferencesDialogNew mainWindow startSettings =
   do -- Create widgets.
      preferencesDialog <- Gtk.dialogNew
      preferencesDialogContent <- liftM Gtk.castToContainer $ Gtk.dialogGetContentArea preferencesDialog
@@ -176,7 +176,9 @@ preferencesDialogNew startSettings =
      withTimeSpinButton <- Gtk.spinButtonNew timeAdjustment 0 1
      withComplexitySpinButton <- Gtk.spinButtonNew complexityAdjustment 0 0
      -- Set properties.
-     preferencesDialog `Gtk.set` [Gtk.windowTitle := "Preferences"]
+     preferencesDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow,
+                                   Gtk.windowModal := True,
+                                   Gtk.windowTitle := "Preferences" ]
      Gtk.frameSetLabel gameFrame "Game"
      Gtk.entrySetText gameNameEntry (gameName startSettings)
      Gtk.frameSetLabel playersFrame "Players"
@@ -430,10 +432,10 @@ mainWindowNew logo =
      notebook <- Gtk.notebookNew
      -- Set properties.
      Gtk.windowSetDefaultSize mainWindow 800 600
-     mainWindow `Gtk.set` [Gtk.windowTitle := "Missile"]
-     mainWindow `Gtk.set` [Gtk.windowIcon := Just logo]
+     mainWindow `Gtk.set` [ Gtk.windowTitle := "Missile",
+                            Gtk.windowIcon := Just logo,
+                            Gtk.containerChild := vbox ]
      -- Set hierarchy.
-     mainWindow `Gtk.set` [Gtk.containerChild := vbox]
      Gtk.containerAdd vbox menuBar
      vbox `Gtk.set` [Gtk.boxChildPacking menuBar := Gtk.PackNatural]
      Gtk.containerAdd menuBar fileImageMenuItem
@@ -498,7 +500,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
         mwQuitImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO onExit
         mwNewImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do globalSettings <- get globalSettingsRef
-             preferencesDialog <- preferencesDialogNew globalSettings
+             preferencesDialog <- preferencesDialogNew mainWindow globalSettings
              runPreferencesDialog globalSettings preferencesDialog $ \settings ->
                gameWithBot (emptyGame settings) (Gtk.postGUIAsync $ botErrorAlert (emptyGame settings) (mwWindow mainWindow)) >>= createGameTab (mwNotebook mainWindow)
         mwCloseImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
@@ -586,7 +588,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
                        let (gameTab, gwb) = tabs IntMap.! pageNum
                        game <- get (gwbGame gwb)
                        let settings = gameSettings game
-                       preferencesDialog <- preferencesDialogNew settings
+                       preferencesDialog <- preferencesDialogNew mainWindow settings
                        runPreferencesDialog settings preferencesDialog $ \newSettings ->
                          do updateGWBSettings gwb newSettings
                             Gtk.notebookSetTabLabelText (mwNotebook mainWindow) (gtWidget gameTab) (gameName newSettings)
@@ -594,17 +596,17 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
                             modifyIORef tabsRef $ IntMap.insert pageNum (gameTab, gwb { gwbBotError = botErrorAlert game' (mwWindow mainWindow) })
                             return ()
                else do globalSettings <- get globalSettingsRef
-                       preferencesDialog <- preferencesDialogNew globalSettings
+                       preferencesDialog <- preferencesDialogNew mainWindow globalSettings
                        runPreferencesDialog globalSettings preferencesDialog $ \newSettings ->
                          globalSettingsRef $= newSettings
         mwAboutImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do aboutDialog <- Gtk.aboutDialogNew
-             aboutDialog `Gtk.set` [Gtk.aboutDialogProgramName := "Missile"]
-             aboutDialog `Gtk.set` [Gtk.aboutDialogVersion := "3.0.0"]
-             aboutDialog `Gtk.set` [Gtk.aboutDialogLicense := Just license]
-             aboutDialog `Gtk.set` [Gtk.aboutDialogWebsite := "https://gitorious.org/opai/missile"]
-             aboutDialog `Gtk.set` [Gtk.aboutDialogAuthors := ["Kurnevsky Evgeny"]]
-             aboutDialog `Gtk.set` [Gtk.aboutDialogLogo := Just logo]
+             aboutDialog `Gtk.set` [ Gtk.aboutDialogProgramName := "Missile",
+                                     Gtk.aboutDialogVersion := "3.0.0",
+                                     Gtk.aboutDialogLicense := Just license,
+                                     Gtk.aboutDialogWebsite := "https://gitlab.com/points/missile",
+                                     Gtk.aboutDialogAuthors := ["Kurnevsky Evgeny"],
+                                     Gtk.aboutDialogLogo := Just logo ]
              Gtk.dialogRun aboutDialog
              Gtk.widgetDestroy aboutDialog
         return ()

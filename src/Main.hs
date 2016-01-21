@@ -618,7 +618,7 @@ main =
      globalSettingsRef <- readSettings "settings.cfg" >>= newIORef
      tabsRef <- newIORef IntMap.empty
      logo <- Gtk.pixbufNewFromFile "Logo.png"
-     license <- readFile "LICENSE"
+     license <- readFile "LICENSE.txt"
      mainWindow <- mainWindowNew logo
      listenMainWindow globalSettingsRef tabsRef mainWindow logo license
      Gtk.widgetShowAll (mwWindow mainWindow)

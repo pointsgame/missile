@@ -1,7 +1,7 @@
 name:                missile
 version:             3.0.0
 license:             GPL-3
-license-file:        LICENSE
+license-file:        LICENSE.txt
 author:              kurnevsky
 maintainer:          kurnevsky@gmail.com
 build-type:          Simple

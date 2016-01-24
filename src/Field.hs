@@ -48,7 +48,7 @@ data Field = Field { scoreRed :: Int,
                      points :: Array Pos Point }
 
 isInField :: Field -> Pos -> Bool
-isInField field = inRange (bounds (points field))
+isInField = inRange . bounds . points
 
 isPuttingAllowed :: Field -> Pos -> Bool
 isPuttingAllowed field pos | not $ isInField field pos = False

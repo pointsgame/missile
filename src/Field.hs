@@ -213,51 +213,52 @@ mergeCaptureChains pos chains = if length chains < 2 then concat chains else mer
 
 putPoint :: Pos -> Player -> Field -> Field
 putPoint pos player field | not (isPuttingAllowed field pos) = error "putPos: putting in the pos is not allowed."
-                          | otherwise = let enemyPlayer = nextPlayer player
-                                            point = points field ! pos
-                                            (enemyEmptyBaseChain, enemyEmptyBase) = getEmptyBase field pos enemyPlayer
-                                            inputPoints = getInputPoints field pos player
-                                            captures = mapMaybe (\(chainPos, capturedPos) ->
-                                              do chain <- buildChain field pos chainPos player
-                                                 let captured = S.elems $ getInsideRing field capturedPos chain
-                                                     capturedCount' = count (\pos' -> isPlayersPoint field pos' enemyPlayer) captured
-                                                     freedCount' = count (\pos' -> isCapturedPoint field pos' player) captured
-                                                 return (chain, captured, capturedCount', freedCount')) inputPoints
-                                            (realCaptures, emptyCaptures) = partition ((/= 0) . thd'') captures
-                                            capturedCount = sum $ map thd'' realCaptures
-                                            freedCount = sum $ map fth'' realCaptures
-                                            newEmptyBase = concatMap snd'' emptyCaptures
-                                            realCaptured = concatMap snd'' realCaptures
-                                            captureChain = mergeCaptureChains pos $ map fst'' realCaptures
-                                            newScoreRed = if player == Red then scoreRed field + capturedCount else scoreRed field - freedCount
-                                            newScoreBlack = if player == Black then scoreBlack field + capturedCount else scoreBlack field - freedCount
-                                            newMoves = (pos, player) : moves field
-                                        in if point == EmptyBasePoint enemyPlayer
-                                           then if not $ null captures
-                                                then Field { scoreRed = newScoreRed,
-                                                             scoreBlack = newScoreBlack,
-                                                             moves = newMoves,
-                                                             lastSurroundChain = Just (captureChain, player),
-                                                             points = points field // (zip enemyEmptyBase (repeat EmptyPoint) ++
-                                                                                       (pos, PlayerPoint player) :
-                                                                                       map (\pos' -> (pos', capture (points field ! pos') player)) realCaptured) }
-                                                else Field { scoreRed = if player == Red then scoreRed field else scoreRed field + 1,
-                                                             scoreBlack = if player == Black then scoreBlack field else scoreBlack field + 1,
-                                                             moves = newMoves,
-                                                             lastSurroundChain = Just (enemyEmptyBaseChain, enemyPlayer),
-                                                             points = points field // (zip enemyEmptyBase (repeat $ BasePoint enemyPlayer False) ++
-                                                                                       [(pos, BasePoint enemyPlayer True)]) }
-                                           else if point == EmptyBasePoint player
-                                           then field { moves = newMoves,
-                                                        lastSurroundChain = Nothing,
-                                                        points = points field // [(pos, PlayerPoint player)] }
-                                           else Field { scoreRed = newScoreRed,
-                                                        scoreBlack = newScoreBlack,
-                                                        moves = newMoves,
-                                                        lastSurroundChain = if null captureChain then Nothing else Just (captureChain, player),
-                                                        points = points field // ((pos, PlayerPoint player) :
-                                                                                  zip newEmptyBase (repeat $ EmptyBasePoint player) ++
-                                                                                  map (\pos' -> (pos', capture (points field ! pos') player)) realCaptured) }
+                          | otherwise =
+  let enemyPlayer = nextPlayer player
+      point = points field ! pos
+      (enemyEmptyBaseChain, enemyEmptyBase) = getEmptyBase field pos enemyPlayer
+      inputPoints = getInputPoints field pos player
+      captures = mapMaybe (\(chainPos, capturedPos) ->
+        do chain <- buildChain field pos chainPos player
+           let captured = S.elems $ getInsideRing field capturedPos chain
+               capturedCount' = count (\pos' -> isPlayersPoint field pos' enemyPlayer) captured
+               freedCount' = count (\pos' -> isCapturedPoint field pos' player) captured
+           return (chain, captured, capturedCount', freedCount')) inputPoints
+      (realCaptures, emptyCaptures) = partition ((/= 0) . thd'') captures
+      capturedCount = sum $ map thd'' realCaptures
+      freedCount = sum $ map fth'' realCaptures
+      newEmptyBase = concatMap snd'' emptyCaptures
+      realCaptured = concatMap snd'' realCaptures
+      captureChain = mergeCaptureChains pos $ map fst'' realCaptures
+      newScoreRed = if player == Red then scoreRed field + capturedCount else scoreRed field - freedCount
+      newScoreBlack = if player == Black then scoreBlack field + capturedCount else scoreBlack field - freedCount
+      newMoves = (pos, player) : moves field
+  in if point == EmptyBasePoint enemyPlayer
+     then if not $ null captures
+          then Field { scoreRed = newScoreRed,
+                       scoreBlack = newScoreBlack,
+                       moves = newMoves,
+                       lastSurroundChain = Just (captureChain, player),
+                       points = points field // (zip enemyEmptyBase (repeat EmptyPoint) ++
+                                                 (pos, PlayerPoint player) :
+                                                 map (\pos' -> (pos', capture (points field ! pos') player)) realCaptured) }
+          else Field { scoreRed = if player == Red then scoreRed field else scoreRed field + 1,
+                       scoreBlack = if player == Black then scoreBlack field else scoreBlack field + 1,
+                       moves = newMoves,
+                       lastSurroundChain = Just (enemyEmptyBaseChain, enemyPlayer),
+                       points = points field // (zip enemyEmptyBase (repeat $ BasePoint enemyPlayer False) ++
+                                                 [(pos, BasePoint enemyPlayer True)]) }
+     else if point == EmptyBasePoint player
+     then field { moves = newMoves,
+                  lastSurroundChain = Nothing,
+                  points = points field // [(pos, PlayerPoint player)] }
+     else Field { scoreRed = newScoreRed,
+                  scoreBlack = newScoreBlack,
+                  moves = newMoves,
+                  lastSurroundChain = if null captureChain then Nothing else Just (captureChain, player),
+                  points = points field // ((pos, PlayerPoint player) :
+                                            zip newEmptyBase (repeat $ EmptyBasePoint player) ++
+                                            map (\pos' -> (pos', capture (points field ! pos') player)) realCaptured) }
 
 fieldWidth :: Field -> Int
 fieldWidth field =

@@ -7,8 +7,6 @@ import qualified Data.Set as S
 import Auxiliary
 import Player
 
---TODO: объединение тректорий захвата.
-
 type Pos = (Int, Int)
 
 n :: Pos -> Pos
@@ -204,6 +202,15 @@ capture point player =
                             | otherwise         -> BasePoint player False
     EmptyBasePoint _                            -> BasePoint player False
 
+mergeCaptureChains :: Pos -> [[Pos]] -> [Pos]
+mergeCaptureChains pos chains = if length chains < 2 then concat chains else mergeCaptureChains' chains where
+  mergeCaptureChains' chains' =
+    let firstChain = head chains'
+        lastChain = last chains'
+    in if head firstChain /= lastChain !! (length lastChain - 2)
+       then foldr (\p acc -> if p /= pos && elem p acc then dropWhile (/= p) acc else p : acc) [] $ concat chains' --TODO: foldl?
+       else mergeCaptureChains' $ tail chains' ++ [firstChain]
+
 putPoint :: Pos -> Player -> Field -> Field
 putPoint pos player field | not (isPuttingAllowed field pos) = error "putPos: putting in the pos is not allowed."
                           | otherwise = let enemyPlayer = nextPlayer player
@@ -221,7 +228,7 @@ putPoint pos player field | not (isPuttingAllowed field pos) = error "putPos: pu
                                             freedCount = sum $ map fth'' realCaptures
                                             newEmptyBase = concatMap snd'' emptyCaptures
                                             realCaptured = concatMap snd'' realCaptures
-                                            captureChain = concatMap (reverse . fst'') realCaptures
+                                            captureChain = mergeCaptureChains pos $ map fst'' realCaptures
                                             newScoreRed = if player == Red then scoreRed field + capturedCount else scoreRed field - freedCount
                                             newScoreBlack = if player == Black then scoreBlack field + capturedCount else scoreBlack field - freedCount
                                             newMoves = (pos, player) : moves field

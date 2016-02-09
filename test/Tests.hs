@@ -46,10 +46,10 @@ surroundEmptyTerritory =
         scoreBlack field @?= 0
         lastSurroundChain field @?= Nothing
         isPuttingAllowed field (1, 1) @? "Putting in pos (1, 1) is not allowed."
-        not (isPuttingAllowed field (0, 1)) @? "Putting in pos (1, 1) is not allowed."
-        not (isPuttingAllowed field (1, 0)) @? "Putting in pos (1, 1) is not allowed."
-        not (isPuttingAllowed field (1, 2)) @? "Putting in pos (1, 1) is not allowed."
-        not (isPuttingAllowed field (2, 1)) @? "Putting in pos (1, 1) is not allowed."
+        not (isPuttingAllowed field (0, 1)) @? "Putting in pos (0, 1) is allowed."
+        not (isPuttingAllowed field (1, 0)) @? "Putting in pos (1, 0) is allowed."
+        not (isPuttingAllowed field (1, 2)) @? "Putting in pos (1, 2) is allowed."
+        not (isPuttingAllowed field (2, 1)) @? "Putting in pos (2, 1) is allowed."
 
 main :: IO ()
 main = defaultMain

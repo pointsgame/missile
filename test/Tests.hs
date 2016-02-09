@@ -36,7 +36,24 @@ simpleSurround =
         fmap snd (lastSurroundChain field) @?= Just Red
         fmap (length . fst) (lastSurroundChain field) @?= Just 4
 
+surroundEmptyTerritory :: Assertion
+surroundEmptyTerritory =
+  let image = " .a. \
+              \ a.a \
+              \ .a. "
+      field = constructField image
+  in do scoreRed field @?= 0
+        scoreBlack field @?= 0
+        lastSurroundChain field @?= Nothing
+        isPuttingAllowed field (1, 1) @? "Putting in pos (1, 1) is not allowed."
+        not (isPuttingAllowed field (0, 1)) @? "Putting in pos (1, 1) is not allowed."
+        not (isPuttingAllowed field (1, 0)) @? "Putting in pos (1, 1) is not allowed."
+        not (isPuttingAllowed field (1, 2)) @? "Putting in pos (1, 1) is not allowed."
+        not (isPuttingAllowed field (2, 1)) @? "Putting in pos (1, 1) is not allowed."
+
 main :: IO ()
 main = defaultMain
-  [ testCase "simple surround" simpleSurround ]
+  [ testCase "simple surround" simpleSurround
+  , testCase "surround empty territory" surroundEmptyTerritory
+  ]
 

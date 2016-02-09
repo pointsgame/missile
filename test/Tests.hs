@@ -14,7 +14,7 @@ constructField :: String -> Field
 constructField image =
   let width = length $ takeWhile (/= ' ') $ dropWhile (== ' ') image
       lines = chunksOf width $ filter (/= ' ') image
-      assertion = Exception.assert (all (\line -> length line == width) lines)
+      assertion = Exception.assert $ all (\line -> length line == width) lines
       height = length lines
       moves = map (\(x, y, char) -> ((x, y), if isLower char then Red else Black)) $
                 sortOn (\(_, _, char) -> (toLower char, isLower char))

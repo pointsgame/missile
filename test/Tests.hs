@@ -51,9 +51,21 @@ surroundEmptyTerritory =
         not (isPuttingAllowed field (1, 2)) @? "Putting in pos (1, 2) is allowed."
         not (isPuttingAllowed field (2, 1)) @? "Putting in pos (2, 1) is allowed."
 
+movePriority :: Assertion
+movePriority =
+  let image = " .aB. \
+              \ aCaB \
+              \ .aB. "
+      field = constructField image
+  in do scoreRed field @?= 0
+        scoreBlack field @?= 1
+        fmap snd (lastSurroundChain field) @?= Just Black
+        fmap (length . fst) (lastSurroundChain field) @?= Just 4
+
 main :: IO ()
 main = defaultMain
   [ testCase "simple surround" simpleSurround
   , testCase "surround empty territory" surroundEmptyTerritory
+  , testCase "move priority" movePriority
   ]
 

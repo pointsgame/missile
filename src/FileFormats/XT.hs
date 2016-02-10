@@ -24,16 +24,18 @@ load' :: BS.ByteString -> Settings-> Maybe Game
 load' byteString settings =
   if length fields == 1
   then Nothing
-  else Just Game { curPlayer = nextPlayer $ snd $ head $ moves $ head fields,
-                   gameFields = fields,
-                   gameTree = toTreeInv fields,
-                   gameSettings = newSettings }
-    where newSettings = settings { gameWidth = 39,
-                                   gameHeight = 32,
-                                   redName = trim $ decodeStrictByteString CP1251 $ BS.take 9 $ BS.drop 11 byteString,
-                                   blackName = trim $ decodeStrictByteString CP1251 $ BS.take 9 $ BS.drop 20 byteString,
-                                   horizontalReflection = False,
-                                   verticalReflection = True }
+  else Just Game { curPlayer = nextPlayer $ snd $ head $ moves $ head fields
+                 , gameFields = fields
+                 , gameTree = toTreeInv fields
+                 , gameSettings = newSettings
+                 }
+    where newSettings = settings { gameWidth = 39
+                                 , gameHeight = 32
+                                 , redName = rim $ decodeStrictByteString CP1251 $ BS.take 9 $ BS.drop 11 byteString
+                                 , blackName = trim $ decodeStrictByteString CP1251 $ BS.take 9 $ BS.drop 20 byteString
+                                 , horizontalReflection = False
+                                 , verticalReflection = True
+                                 }
           fields = load'' (BS.drop 58 byteString) [emptyField 39 32]
           load'' bs fields' | BS.length bs < 4 = fields'
                             | otherwise = let pos = (fromIntegral $ BS.head bs, fromIntegral $ BS.index bs 1)
@@ -75,14 +77,14 @@ save' game = if gameWidth settings /= 39 || gameHeight settings /= 32 || gameIsE
                        0x00 : 0x00 : -- ?
                        0x00 : 0x00 : -- ?
                        0x00 : 0x00 : -- ?
-                       reverse (BS.unpack $ encodeStrictByteString CP1251 $ padRight ' ' 9 $ take 9 $ blackName settings) ++ --Black name
-                       reverse (BS.unpack $ encodeStrictByteString CP1251 $ padRight ' ' 9 $ take 9 $ redName settings) ++ --Red name
+                       reverse (BS.unpack $ encodeStrictByteString CP1251 $ padRight ' ' 9 $ take 9 $ blackName settings) ++ -- Black name
+                       reverse (BS.unpack $ encodeStrictByteString CP1251 $ padRight ' ' 9 $ take 9 $ redName settings) ++ -- Red name
                        0x00 : 0x00 : -- ?
                        0x00 : 0x00 : -- ?
                        0x00 : 0x00 : -- ?
                        (if snd (head movesList) == Red then 0xFF else 0x00) : (if snd (head movesList) == Red then 0xFF else 0x00) : --Last player.
                        fromIntegral ((length movesList - 1) `div` 256) : fromIntegral ((length movesList - 1) `mod` 256) : --Moves length.
-                       121 :  --Version.
+                       121 : -- Version.
                        [])
              where settings = gameSettings game
                    movesList = getMovesList game
@@ -94,6 +96,6 @@ save' game = if gameWidth settings /= 39 || gameHeight settings /= 32 || gameIsE
                        0x00 : 0x00 : -- ?
                        (if player == Red then 0xFF else 0x00) : (if player == Red then 0xFF else 0x00) : --Last player.
                        0x01 :
-                       fromIntegral y : --y
-                       fromIntegral x : --x
+                       fromIntegral y : -- y
+                       fromIntegral x : -- x
                        str

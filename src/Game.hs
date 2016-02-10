@@ -8,10 +8,11 @@ import Field
 import Settings
 import Auxiliary
 
-data Game = Game { curPlayer :: Player,
-                   gameFields :: [Field],
-                   gameTree :: Tree Field,
-                   gameSettings :: Settings }
+data Game = Game { curPlayer :: Player
+                 , gameFields :: [Field]
+                 , gameTree :: Tree Field
+                 , gameSettings :: Settings
+                 }
 
 mapGameTreeMoves :: Tree Field -> (Pos -> Pos) -> Tree Field
 mapGameTreeMoves (Node field children) f = Node field (map (\child -> mapGameTreeMoves' child field) children) where
@@ -28,10 +29,11 @@ selectFields (Node field children) (h : t) =
 emptyGame :: Settings -> Game
 emptyGame settings =
   let field = emptyField (gameWidth settings) (gameHeight settings)
-  in Game { curPlayer = Red,
-            gameFields = [field],
-            gameTree = Node field [],
-            gameSettings = settings }
+  in Game { curPlayer = Red
+          , gameFields = [field]
+          , gameTree = Node field []
+          , gameSettings = settings
+          }
 
 updateGameTree :: [Field] -> Tree Field -> Tree Field
 updateGameTree [] _ = error "updateGameTree: bug."
@@ -47,38 +49,43 @@ putGamePlayersPoint :: Pos -> Player -> Game -> Game
 putGamePlayersPoint pos player game =
   let fields = gameFields game
       newFields = putPoint pos player (head fields) : fields
-  in game { curPlayer = nextPlayer player,
-            gameFields = newFields,
-            gameTree = updateGameTree (tail $ reverse newFields) (gameTree game) }
+  in game { curPlayer = nextPlayer player
+          , gameFields = newFields
+          , gameTree = updateGameTree (tail $ reverse newFields) (gameTree game)
+          }
 
 putGamePoint :: Pos -> Game -> Game
 putGamePoint pos game = putGamePlayersPoint pos (curPlayer game) game
 
 backGame :: Game -> Game
 backGame game =
-  game { curPlayer = snd $ head $ moves $ head $ gameFields game,
-         gameFields = tail $ gameFields game }
+  game { curPlayer = snd $ head $ moves $ head $ gameFields game
+       , gameFields = tail $ gameFields game
+       }
 
 reflectHorizontallyGame :: Game -> Game
 reflectHorizontallyGame game =
   let width = fieldWidth $ rootLabel $ gameTree game
       f (posX, posY) = (width - posX - 1, posY)
       newTree = mapGameTreeMoves (gameTree game) f
-  in game { gameFields = reverse $ selectFields newTree $ map (\(pos, player) -> (f pos, player)) $ reverse $ moves $ head $ gameFields game,
-            gameTree = newTree }
+  in game { gameFields = reverse $ selectFields newTree $ map (\(pos, player) -> (f pos, player)) $ reverse $ moves $ head $ gameFields game
+          , gameTree = newTree
+          }
 
 reflectVerticallyGame :: Game -> Game
 reflectVerticallyGame game =
   let height = fieldHeight $ rootLabel $ gameTree game
       f (posX, posY) = (posX, height - posY - 1)
       newTree = mapGameTreeMoves (gameTree game) f
-  in game { gameFields = reverse $ selectFields newTree $ map (\(pos, player) -> (f pos, player)) $ reverse $ moves $ head $ gameFields game,
-            gameTree = newTree }
+  in game { gameFields = reverse $ selectFields newTree $ map (\(pos, player) -> (f pos, player)) $ reverse $ moves $ head $ gameFields game
+          , gameTree = newTree
+          }
 
 updateGameSettings' :: Settings -> Settings -> Settings
 updateGameSettings' oldSettings newSettings =
-  newSettings { gameWidth = gameWidth oldSettings,
-                gameHeight = gameHeight oldSettings }
+  newSettings { gameWidth = gameWidth oldSettings
+              , gameHeight = gameHeight oldSettings
+              }
 
 updateGameSettings :: Game -> Settings -> Game
 updateGameSettings game settings =

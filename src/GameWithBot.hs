@@ -10,11 +10,12 @@ import Field
 import Game
 import Bot
 
-data GameWithBot = GameWithBot { gwbGame :: IORef Game,
-                                 gwbBot :: IORef (Maybe Bot),
-                                 gwbBusy :: IORef Bool,
-                                 gwbBotError :: IO (),
-                                 gwbUpdated :: IO () }
+data GameWithBot = GameWithBot { gwbGame :: IORef Game
+                               , gwbBot :: IORef (Maybe Bot)
+                               , gwbBusy :: IORef Bool
+                               , gwbBotError :: IO ()
+                               , gwbUpdated :: IO ()
+                               }
 
 loadBot :: Game -> IO () -> (Bot -> IO ()) -> IO ()
 loadBot game callbackError callback =
@@ -55,11 +56,12 @@ gameWithBot game callbackError =
     do busyRef <- newIORef False
        botRef <- newIORef Nothing
        gameRef <- newIORef game
-       let gwb = GameWithBot { gwbGame = gameRef,
-                               gwbBot = botRef,
-                               gwbBusy = busyRef,
-                               gwbBotError = callbackError,
-                               gwbUpdated = return () }
+       let gwb = GameWithBot { gwbGame = gameRef
+                             , gwbBot = botRef
+                             , gwbBusy = busyRef
+                             , gwbBotError = callbackError
+                             , gwbUpdated = return ()
+                             }
        loadGWBBot gwb
        return gwb
 

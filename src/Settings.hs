@@ -11,46 +11,48 @@ import Control.Exception
 data GenMoveType = Simple | WithTime Int | WithComplexity Int
     deriving (Eq, Show, Read)
 
-data Settings = Settings { gameWidth :: Int,
-                           gameHeight :: Int,
-                           gameName :: String,
-                           redName :: String,
-                           blackName :: String,
-                           redColor :: RGB Double,
-                           blackColor :: RGB Double,
-                           backgroundColor :: RGB Double,
-                           gridColor :: RGB Double,
-                           fillingAlpha :: Double,
-                           pointRadius :: Double,
-                           horizontalReflection :: Bool,
-                           verticalReflection :: Bool,
-                           fullFill :: Bool,
-                           gridThickness :: Int,
-                           aiPresent :: Bool,
-                           aiPath :: String,
-                           aiRespondent :: Bool,
-                           aiGenMoveType :: GenMoveType }
+data Settings = Settings { gameWidth :: Int
+                         , gameHeight :: Int
+                         , gameName :: String
+                         , redName :: String
+                         , blackName :: String
+                         , redColor :: RGB Double
+                         , blackColor :: RGB Double
+                         , backgroundColor :: RGB Double
+                         , gridColor :: RGB Double
+                         , fillingAlpha :: Double
+                         , pointRadius :: Double
+                         , horizontalReflection :: Bool
+                         , verticalReflection :: Bool
+                         , fullFill :: Bool
+                         , gridThickness :: Int
+                         , aiPresent :: Bool
+                         , aiPath :: String
+                         , aiRespondent :: Bool
+                         , aiGenMoveType :: GenMoveType
+                         }
 
 defaultSettings :: Settings
-defaultSettings = Settings { gameWidth = 39,
-                             gameHeight = 32,
-                             gameName = "Game",
-                             redName = "Red",
-                             blackName = "Black",
-                             redColor = RGB 1 0 0,
-                             blackColor = RGB 0 0 0,
-                             backgroundColor = RGB 1 1 1,
-                             gridColor = RGB 0.3 0.3 0.3,
-                             fillingAlpha = 0.5,
-                             pointRadius = 1,
-                             horizontalReflection = False,
-                             verticalReflection = False,
-                             fullFill = True,
-                             gridThickness = 1,
-                             aiPresent = False,
-                             aiPath = "./opai",
-                             aiRespondent = True,
-                             aiGenMoveType = Simple }
+defaultSettings = Settings { gameWidth = 39
+                           , gameHeight = 32
+                           , gameName = "Game"
+                           , redName = "Red"
+                           , blackName = "Black"
+                           , redColor = RGB 1 0 0
+                           , blackColor = RGB 0 0 0
+                           , backgroundColor = RGB 1 1 1
+                           , gridColor = RGB 0.3 0.3 0.3
+                           , fillingAlpha = 0.5
+                           , pointRadius = 1
+                           , horizontalReflection = False
+                           , verticalReflection = False
+                           , fullFill = True
+                           , gridThickness = 1
+                           , aiPresent = False
+                           , aiPath = "./opai"
+                           , aiRespondent = True
+                           , aiGenMoveType = Simple
+                           }
 
 readSettings :: String -> IO Settings
 readSettings fileName = do fileExist <- doesFileExist fileName
@@ -83,61 +85,62 @@ readSettings fileName = do fileExist <- doesFileExist fileName
                                               aiGenMoveTypeConf = get cfg "AI" "ai_gen_move_type"
                                           in Settings { gameWidth = case gameWidthConf of
                                                                       Left _    -> gameWidth defaultSettings
-                                                                      Right int -> int,
-                                                        gameHeight = case gameHeightConf of
+                                                                      Right int -> int
+                                                      , gameHeight = case gameHeightConf of
                                                                       Left _    -> gameHeight defaultSettings
-                                                                      Right int -> int,
-                                                        gameName = case gameNameConf of
+                                                                      Right int -> int
+                                                      , gameName = case gameNameConf of
                                                                       Left _    -> gameName defaultSettings
-                                                                      Right str -> str,
-                                                        redName = case redNameConf of
+                                                                      Right str -> str
+                                                      , redName = case redNameConf of
                                                                     Left _    -> redName defaultSettings
-                                                                    Right str -> str,
-                                                        blackName = case blackNameConf of
+                                                                    Right str -> str
+                                                      , blackName = case blackNameConf of
                                                                       Left _    -> blackName defaultSettings
-                                                                      Right str -> str,
-                                                        redColor = case redColorConf of
+                                                                      Right str -> str
+                                                      , redColor = case redColorConf of
                                                                      Left _    -> redColor defaultSettings
-                                                                     Right str -> toSRGB $ sRGB24read str,
-                                                        blackColor = case blackColorConf of
+                                                                     Right str -> toSRGB $ sRGB24read str
+                                                      , blackColor = case blackColorConf of
                                                                        Left _    -> blackColor defaultSettings
-                                                                       Right str -> toSRGB $ sRGB24read str,
-                                                        backgroundColor = case backgroundColorConf of
+                                                                       Right str -> toSRGB $ sRGB24read str
+                                                      , backgroundColor = case backgroundColorConf of
                                                                             Left _    -> backgroundColor defaultSettings
-                                                                            Right str -> toSRGB $ sRGB24read str,
-                                                        gridColor = case gridColorConf of
+                                                                            Right str -> toSRGB $ sRGB24read str
+                                                      , gridColor = case gridColorConf of
                                                                       Left _    -> gridColor defaultSettings
-                                                                      Right str -> toSRGB $ sRGB24read str,
-                                                        fillingAlpha = case fillingAlphaConf of
+                                                                      Right str -> toSRGB $ sRGB24read str
+                                                      , fillingAlpha = case fillingAlphaConf of
                                                                          Left _    -> fillingAlpha defaultSettings
-                                                                         Right int -> int,
-                                                        pointRadius = case pointRadiusConf of
+                                                                         Right int -> int
+                                                      , pointRadius = case pointRadiusConf of
                                                                         Left _    -> pointRadius defaultSettings
-                                                                        Right val -> val,
-                                                        horizontalReflection = case horizontalReflectionConf of
+                                                                        Right val -> val
+                                                      , horizontalReflection = case horizontalReflectionConf of
                                                                                  Left _    -> horizontalReflection defaultSettings
-                                                                                 Right val -> val,
-                                                        verticalReflection = case verticalReflectionConf of
+                                                                                 Right val -> val
+                                                      , verticalReflection = case verticalReflectionConf of
                                                                                  Left _    -> verticalReflection defaultSettings
-                                                                                 Right val -> val,
-                                                        fullFill = case fullFillConf of
+                                                                                 Right val -> val
+                                                      , fullFill = case fullFillConf of
                                                                      Left _    -> fullFill defaultSettings
-                                                                     Right val -> val,
-                                                        gridThickness = case gridThicknessConf of
+                                                                     Right val -> val
+                                                      , gridThickness = case gridThicknessConf of
                                                                           Left _    -> gridThickness defaultSettings
-                                                                          Right val -> val,
-                                                        aiPresent = case aiPresentConf of
+                                                                          Right val -> val
+                                                      , aiPresent = case aiPresentConf of
                                                                       Left _    -> aiPresent defaultSettings
-                                                                      Right val -> val,
-                                                        aiPath = case aiPathConf of
+                                                                      Right val -> val
+                                                      , aiPath = case aiPathConf of
                                                                    Left _    -> aiPath defaultSettings
-                                                                   Right val -> val,
-                                                        aiRespondent = case aiRespondentConf of
+                                                                   Right val -> val
+                                                      , aiRespondent = case aiRespondentConf of
                                                                          Left _    -> aiRespondent defaultSettings
-                                                                         Right val -> val,
-                                                        aiGenMoveType = case aiGenMoveTypeConf of
+                                                                         Right val -> val
+                                                      , aiGenMoveType = case aiGenMoveTypeConf of
                                                                           Left _    -> aiGenMoveType defaultSettings
-                                                                          Right val -> val }
+                                                                          Right val -> val
+                                                      }
 
 writeSettings :: Settings -> String -> IO ()
 writeSettings settings fileName = let cfgStr = forceEither $ do let cfg = emptyCP

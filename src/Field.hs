@@ -39,11 +39,12 @@ data Point = EmptyPoint |
              EmptyBasePoint Player
   deriving (Eq, Show, Read)
 
-data Field = Field { scoreRed :: Int,
-                     scoreBlack :: Int,
-                     moves :: [(Pos, Player)],
-                     lastSurroundChain :: Maybe ([Pos], Player),
-                     points :: Array Pos Point }
+data Field = Field { scoreRed :: Int
+                   , scoreBlack :: Int
+                   , moves :: [(Pos, Player)]
+                   , lastSurroundChain :: Maybe ([Pos], Player)
+                   , points :: Array Pos Point
+                   }
 
 isInField :: Field -> Pos -> Bool
 isInField = inRange . bounds . points
@@ -84,11 +85,12 @@ wave field startPos f = wave' S.empty (S.singleton startPos)
         neighborhood pos = [n pos, s pos, w pos, e pos]
 
 emptyField :: Int -> Int -> Field
-emptyField width height = Field { scoreRed = 0,
-                                  scoreBlack = 0,
-                                  moves = [],
-                                  lastSurroundChain = Nothing,
-                                  points = listArray ((0, 0), (width - 1, height - 1)) (repeat EmptyPoint) }
+emptyField width height = Field { scoreRed = 0
+                                , scoreBlack = 0
+                                , moves = []
+                                , lastSurroundChain = Nothing
+                                , points = listArray ((0, 0), (width - 1, height - 1)) (repeat EmptyPoint)
+                                }
 
 getFirstNextPos :: Pos -> Pos -> Pos
 getFirstNextPos centerPos pos =

@@ -21,44 +21,47 @@ import qualified FileFormats.XT as XT
 import Rendering
 import Auxiliary
 
-data MainWindow = MainWindow { mwWindow :: Gtk.Window,
-                               mwNewImageMenuItem :: Gtk.ImageMenuItem,
-                               mwOpenImageMenuItem :: Gtk.ImageMenuItem,
-                               mwSaveImageMenuItem :: Gtk.ImageMenuItem,
-                               mwCloseImageMenuItem :: Gtk.ImageMenuItem,
-                               mwQuitImageMenuItem :: Gtk.ImageMenuItem,
-                               mwUndoImageMenuItem :: Gtk.ImageMenuItem,
-                               mwReflectHorizontallyMenuItem :: Gtk.MenuItem,
-                               mwReflectVerticallyMenuItem :: Gtk.MenuItem,
-                               mwPreferencesImageMenuItem :: Gtk.ImageMenuItem,
-                               mwAboutImageMenuItem :: Gtk.ImageMenuItem,
-                               mwNotebook :: Gtk.Notebook }
+data MainWindow = MainWindow { mwWindow :: Gtk.Window
+                             , mwNewImageMenuItem :: Gtk.ImageMenuItem
+                             , mwOpenImageMenuItem :: Gtk.ImageMenuItem
+                             , mwSaveImageMenuItem :: Gtk.ImageMenuItem
+                             , mwCloseImageMenuItem :: Gtk.ImageMenuItem
+                             , mwQuitImageMenuItem :: Gtk.ImageMenuItem
+                             , mwUndoImageMenuItem :: Gtk.ImageMenuItem
+                             , mwReflectHorizontallyMenuItem :: Gtk.MenuItem
+                             , mwReflectVerticallyMenuItem :: Gtk.MenuItem
+                             , mwPreferencesImageMenuItem :: Gtk.ImageMenuItem
+                             , mwAboutImageMenuItem :: Gtk.ImageMenuItem
+                             , mwNotebook :: Gtk.Notebook
+                             }
 
-data PreferencesDialog = PreferencesDialog { pdDialog :: Gtk.Dialog,
-                                             pdGameNameEntry :: Gtk.Entry,
-                                             pdFieldWidthSpinButton :: Gtk.SpinButton,
-                                             pdFieldHeightSpinButton :: Gtk.SpinButton,
-                                             pdRedNameEntry :: Gtk.Entry,
-                                             pdBlackNameEntry :: Gtk.Entry,
-                                             pdRedColorButton :: Gtk.ColorButton,
-                                             pdBlackColorButton :: Gtk.ColorButton,
-                                             pdBackgroundColorButton :: Gtk.ColorButton,
-                                             pdGridColorButton :: Gtk.ColorButton,
-                                             pdFillingAlphaSpinButton :: Gtk.SpinButton,
-                                             pdHorizontalReflectionCheckButton :: Gtk.CheckButton,
-                                             pdVerticalReflectionCheckButton :: Gtk.CheckButton,
-                                             pdAiPresentCheckButton :: Gtk.CheckButton,
-                                             pdAiPathFileChooserButton :: Gtk.FileChooserButton,
-                                             pdAiRespondentCheckButton :: Gtk.CheckButton,
-                                             pdSimpleRadioButton :: Gtk.RadioButton,
-                                             pdWithTimeRadioButton :: Gtk.RadioButton,
-                                             pdWithTimeSpinButton :: Gtk.SpinButton,
-                                             pdWithComplexityRadioButton :: Gtk.RadioButton,
-                                             pdWithComplexitySpinButton :: Gtk.SpinButton }
+data PreferencesDialog = PreferencesDialog { pdDialog :: Gtk.Dialog
+                                           , pdGameNameEntry :: Gtk.Entry
+                                           , pdFieldWidthSpinButton :: Gtk.SpinButton
+                                           , pdFieldHeightSpinButton :: Gtk.SpinButton
+                                           , pdRedNameEntry :: Gtk.Entry
+                                           , pdBlackNameEntry :: Gtk.Entry
+                                           , pdRedColorButton :: Gtk.ColorButton
+                                           , pdBlackColorButton :: Gtk.ColorButton
+                                           , pdBackgroundColorButton :: Gtk.ColorButton
+                                           , pdGridColorButton :: Gtk.ColorButton
+                                           , pdFillingAlphaSpinButton :: Gtk.SpinButton
+                                           , pdHorizontalReflectionCheckButton :: Gtk.CheckButton
+                                           , pdVerticalReflectionCheckButton :: Gtk.CheckButton
+                                           , pdAiPresentCheckButton :: Gtk.CheckButton
+                                           , pdAiPathFileChooserButton :: Gtk.FileChooserButton
+                                           , pdAiRespondentCheckButton :: Gtk.CheckButton
+                                           , pdSimpleRadioButton :: Gtk.RadioButton
+                                           , pdWithTimeRadioButton :: Gtk.RadioButton
+                                           , pdWithTimeSpinButton :: Gtk.SpinButton
+                                           , pdWithComplexityRadioButton :: Gtk.RadioButton
+                                           , pdWithComplexitySpinButton :: Gtk.SpinButton
+                                           }
 
-data GameTab = GameTab { gtWidget :: Gtk.Widget,
-                         gtDrawingArea :: Gtk.DrawingArea,
-                         gtCoordLabel :: Gtk.Label }
+data GameTab = GameTab { gtWidget :: Gtk.Widget
+                       , gtDrawingArea :: Gtk.DrawingArea
+                       , gtCoordLabel :: Gtk.Label
+                       }
 
 rgbToGtkColor :: RGB Double -> Gtk.Color
 rgbToGtkColor (Colour.RGB r g b) =
@@ -90,25 +93,26 @@ getSettings startSettings preferencesDialog =
      curTime <- liftM (round . (* 1000)) $ Gtk.get (pdWithTimeSpinButton preferencesDialog) Gtk.spinButtonValue
      curWithComplexity <- Gtk.toggleButtonGetActive $ pdWithComplexityRadioButton preferencesDialog
      curComplexity <- liftM round $ Gtk.get (pdWithComplexitySpinButton preferencesDialog) Gtk.spinButtonValue
-     return startSettings { gameWidth = curGameWidth,
-                            gameHeight = curGameHeight,
-                            gameName = curGameName,
-                            redName = curRedName,
-                            blackName = curBlackName,
-                            redColor = curRedColor,
-                            blackColor = curBlackColor,
-                            backgroundColor = curBackgroundColor,
-                            gridColor = curGridColor,
-                            fillingAlpha = curFillingAlpha,
-                            horizontalReflection = curHorizontalReflection,
-                            verticalReflection = curVerticalReflection,
-                            aiPresent = curAiPresent && isJust curAiPathMaybe,
-                            aiPath = fromMaybe "" curAiPathMaybe,
-                            aiRespondent = curAiRespondent,
-                            aiGenMoveType = if | curSimple         -> Simple
+     return startSettings { gameWidth = curGameWidth
+                          , gameHeight = curGameHeight
+                          , gameName = curGameName
+                          , redName = curRedName
+                          , blackName = curBlackName
+                          , redColor = curRedColor
+                          , blackColor = curBlackColor
+                          , backgroundColor = curBackgroundColor
+                          , gridColor = curGridColor
+                          , fillingAlpha = curFillingAlpha
+                          , horizontalReflection = curHorizontalReflection
+                          , verticalReflection = curVerticalReflection
+                          , aiPresent = curAiPresent && isJust curAiPathMaybe
+                          , aiPath = fromMaybe "" curAiPathMaybe
+                          , aiRespondent = curAiRespondent
+                          , aiGenMoveType = if | curSimple         -> Simple
                                                | curWithTime       -> WithTime curTime
                                                | curWithComplexity -> WithComplexity curComplexity
-                                               | otherwise         -> error "Type of move generation not specified!" }
+                                               | otherwise         -> error "Type of move generation not specified!"
+                          }
 
 preferencesDialogNew :: MainWindow -> Settings -> IO PreferencesDialog
 preferencesDialogNew mainWindow startSettings =
@@ -176,9 +180,10 @@ preferencesDialogNew mainWindow startSettings =
      withTimeSpinButton <- Gtk.spinButtonNew timeAdjustment 0 1
      withComplexitySpinButton <- Gtk.spinButtonNew complexityAdjustment 0 0
      -- Set properties.
-     preferencesDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow,
-                                   Gtk.windowModal := True,
-                                   Gtk.windowTitle := "Preferences" ]
+     preferencesDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow
+                                 , Gtk.windowModal := True
+                                 , Gtk.windowTitle := "Preferences"
+                                 ]
      Gtk.frameSetLabel gameFrame "Game"
      Gtk.entrySetText gameNameEntry (gameName startSettings)
      Gtk.frameSetLabel playersFrame "Players"
@@ -242,27 +247,28 @@ preferencesDialogNew mainWindow startSettings =
      Gtk.tableAttachDefaults genMoveTypeFrameTable withComplexityRadioButton 0 1 2 3
      Gtk.tableAttachDefaults genMoveTypeFrameTable withComplexitySpinButton 1 2 2 3
      -- Return dialog.
-     return PreferencesDialog { pdDialog = preferencesDialog,
-                                pdGameNameEntry = gameNameEntry,
-                                pdFieldWidthSpinButton = fieldWidthSpinButton,
-                                pdFieldHeightSpinButton = fieldHeightSpinButton,
-                                pdRedNameEntry = redNameEntry,
-                                pdBlackNameEntry = blackNameEntry,
-                                pdRedColorButton = redColorButton,
-                                pdBlackColorButton = blackColorButton,
-                                pdBackgroundColorButton = backgroundColorButton,
-                                pdGridColorButton = gridColorButton,
-                                pdFillingAlphaSpinButton = fillingAlphaSpinButton,
-                                pdHorizontalReflectionCheckButton = horizontalReflectionCheckButton,
-                                pdVerticalReflectionCheckButton = verticalReflectionCheckButton,
-                                pdAiPresentCheckButton = aiPresentCheckButton,
-                                pdAiPathFileChooserButton = aiPathFileChooserButton,
-                                pdAiRespondentCheckButton = aiRespondentCheckButton,
-                                pdSimpleRadioButton = simpleRadioButton,
-                                pdWithTimeRadioButton = withTimeRadioButton,
-                                pdWithTimeSpinButton = withTimeSpinButton,
-                                pdWithComplexityRadioButton = withComplexityRadioButton,
-                                pdWithComplexitySpinButton = withComplexitySpinButton }
+     return PreferencesDialog { pdDialog = preferencesDialog
+                              , pdGameNameEntry = gameNameEntry
+                              , pdFieldWidthSpinButton = fieldWidthSpinButton
+                              , pdFieldHeightSpinButton = fieldHeightSpinButton
+                              , pdRedNameEntry = redNameEntry
+                              , pdBlackNameEntry = blackNameEntry
+                              , pdRedColorButton = redColorButton
+                              , pdBlackColorButton = blackColorButton
+                              , pdBackgroundColorButton = backgroundColorButton
+                              , pdGridColorButton = gridColorButton
+                              , pdFillingAlphaSpinButton = fillingAlphaSpinButton
+                              , pdHorizontalReflectionCheckButton = horizontalReflectionCheckButton
+                              , pdVerticalReflectionCheckButton = verticalReflectionCheckButton
+                              , pdAiPresentCheckButton = aiPresentCheckButton
+                              , pdAiPathFileChooserButton = aiPathFileChooserButton
+                              , pdAiRespondentCheckButton = aiRespondentCheckButton
+                              , pdSimpleRadioButton = simpleRadioButton
+                              , pdWithTimeRadioButton = withTimeRadioButton
+                              , pdWithTimeSpinButton = withTimeSpinButton
+                              , pdWithComplexityRadioButton = withComplexityRadioButton
+                              , pdWithComplexitySpinButton = withComplexitySpinButton
+                              }
 
 runPreferencesDialog :: Settings -> PreferencesDialog -> (Settings -> IO ()) -> IO ()
 runPreferencesDialog startSettings preferencesDialog f =
@@ -286,9 +292,10 @@ gameTabNew =
      coordLabel <- Gtk.labelNew (Nothing :: Maybe [Char])
      Gtk.tableAttachDefaults table drawingArea 0 1 0 1
      Gtk.tableAttach table coordLabel 0 1 1 2 [] [] 1 1
-     return GameTab { gtWidget = Gtk.toWidget table,
-                      gtDrawingArea = drawingArea,
-                      gtCoordLabel = coordLabel }
+     return GameTab { gtWidget = Gtk.toWidget table
+                    , gtDrawingArea = drawingArea
+                    , gtCoordLabel = coordLabel
+                    }
 
 setSourceRGBA :: RGB Double -> Double -> Cairo.Render ()
 setSourceRGBA rgb = Cairo.setSourceRGBA (channelRed rgb) (channelGreen rgb) (channelBlue rgb)
@@ -458,18 +465,19 @@ mainWindowNew logo =
      Gtk.containerAdd helpMenu aboutImageMenuItem
      Gtk.containerAdd vbox notebook
      -- Return window.
-     return MainWindow { mwWindow = mainWindow,
-                         mwNewImageMenuItem = newImageMenuItem,
-                         mwOpenImageMenuItem = openImageMenuItem,
-                         mwSaveImageMenuItem = saveImageMenuItem,
-                         mwCloseImageMenuItem = closeImageMenuItem,
-                         mwQuitImageMenuItem = quitImageMenuItem,
-                         mwUndoImageMenuItem = undoImageMenuItem,
-                         mwReflectHorizontallyMenuItem = reflectHorizontallyMenuItem,
-                         mwReflectVerticallyMenuItem = reflectVerticallyMenuItem,
-                         mwPreferencesImageMenuItem = preferencesImageMenuItem,
-                         mwAboutImageMenuItem = aboutImageMenuItem,
-                         mwNotebook = notebook }
+     return MainWindow { mwWindow = mainWindow
+                       , mwNewImageMenuItem = newImageMenuItem
+                       , mwOpenImageMenuItem = openImageMenuItem
+                       , mwSaveImageMenuItem = saveImageMenuItem
+                       , mwCloseImageMenuItem = closeImageMenuItem
+                       , mwQuitImageMenuItem = quitImageMenuItem
+                       , mwUndoImageMenuItem = undoImageMenuItem
+                       , mwReflectHorizontallyMenuItem = reflectHorizontallyMenuItem
+                       , mwReflectVerticallyMenuItem = reflectVerticallyMenuItem
+                       , mwPreferencesImageMenuItem = preferencesImageMenuItem
+                       , mwAboutImageMenuItem = aboutImageMenuItem
+                       , mwNotebook = notebook
+                       }
 
 listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameTab, GameWithBot)) -> MainWindow -> Gtk.Pixbuf -> String -> IO ()
 listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
@@ -601,13 +609,14 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
                          globalSettingsRef $= newSettings
         mwAboutImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do aboutDialog <- Gtk.aboutDialogNew
-             aboutDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow,
-                                     Gtk.aboutDialogProgramName := "Missile",
-                                     Gtk.aboutDialogVersion := "3.0.0",
-                                     Gtk.aboutDialogLicense := Just license,
-                                     Gtk.aboutDialogWebsite := "https://gitlab.com/points/missile",
-                                     Gtk.aboutDialogAuthors := ["Kurnevsky Evgeny"],
-                                     Gtk.aboutDialogLogo := Just logo ]
+             aboutDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow
+                                   , Gtk.aboutDialogProgramName := "Missile"
+                                   , Gtk.aboutDialogVersion := "3.0.0"
+                                   , Gtk.aboutDialogLicense := Just license
+                                   , Gtk.aboutDialogWebsite := "https://gitlab.com/points/missile"
+                                   , Gtk.aboutDialogAuthors := ["Kurnevsky Evgeny"]
+                                   , Gtk.aboutDialogLogo := Just logo
+                                   ]
              Gtk.dialogRun aboutDialog
              Gtk.widgetDestroy aboutDialog
         return ()

@@ -10,20 +10,22 @@ import Control.Exception
 import Player
 import Field
 
-data Bot = Bot { stdInput :: Handle,
-                 stdOutput :: Handle,
-                 stdError :: Handle,
-                 processId :: ProcessHandle }
+data Bot = Bot { stdInput :: Handle
+               , stdOutput :: Handle
+               , stdError :: Handle
+               , processId :: ProcessHandle
+               }
 
 run :: String -> IO Bot
 run path = do (inp, out, err, pid) <- runInteractiveProcess path [] Nothing Nothing
               hSetBuffering inp NoBuffering
               hSetBuffering out NoBuffering
               hSetBuffering err NoBuffering
-              return Bot { stdInput = inp,
-                           stdOutput = out,
-                           stdError = err,
-                           processId = pid }
+              return Bot { stdInput = inp
+                         , stdOutput = out
+                         , stdError = err
+                         , processId = pid
+                         }
 
 quit :: Bot -> IO ()
 quit bot = hPutStrLn (stdInput bot) "0 quit"

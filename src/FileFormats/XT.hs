@@ -20,7 +20,7 @@ load name settings =
                       return Nothing
        Right bs -> return $ load' bs settings
 
-load' :: BS.ByteString -> Settings-> Maybe Game
+load' :: BS.ByteString -> Settings -> Maybe Game
 load' byteString settings =
   if length fields == 1
   then Nothing
@@ -31,7 +31,7 @@ load' byteString settings =
                  }
     where newSettings = settings { gameWidth = 39
                                  , gameHeight = 32
-                                 , redName = rim $ decodeStrictByteString CP1251 $ BS.take 9 $ BS.drop 11 byteString
+                                 , redName = trim $ decodeStrictByteString CP1251 $ BS.take 9 $ BS.drop 11 byteString
                                  , blackName = trim $ decodeStrictByteString CP1251 $ BS.take 9 $ BS.drop 20 byteString
                                  , horizontalReflection = False
                                  , verticalReflection = True

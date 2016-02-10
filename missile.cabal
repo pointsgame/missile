@@ -34,7 +34,6 @@ executable missile
                       encoding,
                       colour,
                       ConfigFile,
-                      utf8-string,
                       gtk3,
                       cairo
   default-language:   Haskell2010

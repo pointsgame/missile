@@ -11,7 +11,6 @@ import Data.Colour.SRGB as SRGB
 import qualified Graphics.UI.Gtk as Gtk
 import Graphics.UI.Gtk (AttrOp((:=)))
 import qualified Graphics.Rendering.Cairo as Cairo
-import Codec.Binary.UTF8.String
 import Player
 import Field
 import Settings
@@ -86,7 +85,7 @@ getSettings startSettings preferencesDialog =
      curHorizontalReflection <- Gtk.toggleButtonGetActive $ pdHorizontalReflectionCheckButton preferencesDialog
      curVerticalReflection <- Gtk.toggleButtonGetActive $ pdVerticalReflectionCheckButton preferencesDialog
      curAiPresent <- Gtk.toggleButtonGetActive $ pdAiPresentCheckButton preferencesDialog
-     curAiPathMaybe <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename $ pdAiPathFileChooserButton preferencesDialog
+     curAiPathMaybe <- Gtk.fileChooserGetFilename $ pdAiPathFileChooserButton preferencesDialog
      curAiRespondent <- Gtk.toggleButtonGetActive $ pdAiRespondentCheckButton preferencesDialog
      curSimple <- Gtk.toggleButtonGetActive $ pdSimpleRadioButton preferencesDialog
      curWithTime <- Gtk.toggleButtonGetActive $ pdWithTimeRadioButton preferencesDialog
@@ -555,7 +554,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
              case response of
                Gtk.ResponseDeleteEvent -> return ()
                Gtk.ResponseCancel      -> return ()
-               Gtk.ResponseOk          -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
+               Gtk.ResponseOk          -> do maybeFileName <- Gtk.fileChooserGetFilename fileChooser
                                              case maybeFileName of
                                                Just fileName ->
                                                  do globalSettings <- get globalSettingsRef
@@ -579,7 +578,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
                   case response of
                     Gtk.ResponseDeleteEvent -> return ()
                     Gtk.ResponseCancel      -> return ()
-                    Gtk.ResponseOk          -> do maybeFileName <- liftM (fmap decodeString) $ Gtk.fileChooserGetFilename fileChooser
+                    Gtk.ResponseOk          -> do maybeFileName <- Gtk.fileChooserGetFilename fileChooser
                                                   case maybeFileName of
                                                     Just fileName -> do tabs <- get tabsRef
                                                                         let (_, gwb) = tabs IntMap.! pageNum

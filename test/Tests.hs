@@ -19,7 +19,6 @@ main = defaultMain
   , testCase "a hole inside a surrounding, after 'control' surrounding" holeInsideSurroundingAfterControlSurrounding
   , testCase "surrounding does not expand" surroundingDoesNotExpand
   , testCase "2 surroundings with common border" twoSurroundingsWithCommonBorder
-  , testCase "2 surroundings with common dot" twoSurroundingsWithCommonDot
   , testCase "3 surroundings with common borders" threeSurroundingsWithCommonBorders
   ]
 

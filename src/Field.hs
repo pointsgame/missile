@@ -205,12 +205,12 @@ capture point player =
     EmptyBasePoint _                            -> BasePoint player False
 
 mergeCaptureChains :: Pos -> [[Pos]] -> [Pos]
-mergeCaptureChains pos chains = if length chains < 2 then concat chains else mergeCaptureChains' chains where
+mergeCaptureChains pos chains = if length chains < 2 then reverse (concat chains) else mergeCaptureChains' chains where
   mergeCaptureChains' chains' =
     let firstChain = head chains'
         lastChain = last chains'
     in if head firstChain /= lastChain !! (length lastChain - 2)
-       then foldr (\p acc -> if p /= pos && elem p acc then dropWhile (/= p) acc else p : acc) [] $ concat chains' --TODO: foldl?
+       then foldl (\acc p -> if p /= pos && elem p acc then dropWhile (/= p) acc else p : acc) [] $ concat chains'
        else mergeCaptureChains' $ tail chains' ++ [firstChain]
 
 putPoint :: Pos -> Player -> Field -> Field

@@ -305,13 +305,30 @@ listenGameTab gwb gameTab =
                               headField = head fields
                               gameFieldWidth = fieldWidth headField
                               gameFieldHeight = fieldHeight headField
-                              (posX, posY) = toGamePos game width height (x, y)
+                              settings = gameSettings game
+                              horizontalReflection' = horizontalReflection settings
+                              verticalReflection' = verticalReflection settings
+                              (_, _, toGamePosX, toGamePosY) = fromToFieldPos horizontalReflection' verticalReflection' gameFieldWidth gameFieldHeight width height
+                              posX = toGamePosX x
+                              posY = toGamePosY y
                           when (posX >= 0 && posY >= 0 && posX < gameFieldWidth && posY < gameFieldHeight) $ f (posX, posY)
      gtDrawingArea gameTab `Gtk.on` Gtk.draw $
        do game <- liftIO $ get (gwbGame gwb)
           width <- liftIO $ Gtk.widgetGetAllocatedWidth $ gtDrawingArea gameTab
           height <- liftIO $ Gtk.widgetGetAllocatedHeight $ gtDrawingArea gameTab
-          draw game (fromIntegral width) (fromIntegral height)
+          let settings = gameSettings game
+              drawSettings = DrawSettings { dsHReflection = horizontalReflection settings
+                                          , dsVReflection = verticalReflection settings
+                                          , dsGridThickness = gridThickness settings
+                                          , dsGridColor = gridColor settings
+                                          , dsBackgroundColor = backgroundColor settings
+                                          , dsRedColor = redColor settings
+                                          , dsBlackColor = blackColor settings
+                                          , dsPointRadius = pointRadius settings
+                                          , dsFillingAlpha = fillingAlpha settings
+                                          , dsFullFill = fullFill settings
+                                          }
+          draw drawSettings (fromIntegral width) (fromIntegral height) (gameFields game)
      gtDrawingArea gameTab `Gtk.on` Gtk.buttonPressEvent $ Gtk.tryEvent $
         do Gtk.LeftButton <- Gtk.eventButton
            withPos $ \pos -> do putGWBPoint pos gwb

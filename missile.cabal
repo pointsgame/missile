@@ -58,7 +58,10 @@ executable versus
                       directory,
                       process,
                       random,
-                      optparse-applicative
+                      optparse-applicative,
+                      colour,
+                      gtk3,
+                      cairo
   default-language:   Haskell2010
   default-extensions: MultiWayIf,
                       LambdaCase

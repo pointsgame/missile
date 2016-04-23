@@ -46,12 +46,6 @@ data Field = Field { scoreRed :: Int
                    , points :: Array Pos Point
                    }
 
-isFullField :: Field -> Bool
-isFullField field = all (\case
-                            EmptyPoint       -> False
-                            EmptyBasePoint _ -> False
-                            _                -> True) $ elems $ points field
-
 isInField :: Field -> Pos -> Bool
 isInField = inRange . bounds . points
 

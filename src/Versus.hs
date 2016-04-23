@@ -1,6 +1,7 @@
 module Versus (main) where
 
 import Data.Maybe
+import Data.Array
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Applicative
@@ -71,6 +72,9 @@ drawSettings = DrawSettings { dsHReflection = False
                             , dsFullFill = True
                             }
 
+gameOver :: Field -> Bool
+gameOver field = all (/= EmptyPoint) $ elems $ points field
+
 crossMoves :: Int -> Int -> [(Pos, Player)]
 crossMoves width' height' = [((width' `div` 2 - 1, height' `div` 2 - 1), Red),
                              ((width' `div` 2, height' `div` 2 - 1), Black),
@@ -102,11 +106,11 @@ playGame settings bot1 bot2 fieldsMVar rng swap redraw =
      redraw
      playGame' fields Red where
        playGame' [] _ = error "Internal error."
-       playGame' (fields @ (field : _)) player | isFullField field = do putStrLn $ "Game is done! Red score is " ++ show (scoreRed field) ++ ". Black score is " ++ show (scoreBlack field) ++ "."
-                                                                        return $ if | scoreRed field > scoreBlack field -> Just Red
-                                                                                    | scoreRed field < scoreBlack field -> Just Black
-                                                                                    | otherwise                         -> Nothing
-                                               | otherwise         =
+       playGame' (fields @ (field : _)) player | gameOver field = do putStrLn $ "Game is done! Red score is " ++ show (scoreRed field) ++ ". Black score is " ++ show (scoreBlack field) ++ "."
+                                                                     return $ if | scoreRed field > scoreBlack field -> Just Red
+                                                                                 | scoreRed field < scoreBlack field -> Just Black
+                                                                                 | otherwise                         -> Nothing
+                                               | otherwise      =
          do let bot = case player of
                         Red   -> if swap then bot2 else bot1
                         Black -> if swap then bot1 else bot2

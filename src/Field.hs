@@ -229,7 +229,7 @@ putPoint pos player field | not (isPuttingAllowed field pos) = error "putPos: pu
       (realCaptures, emptyCaptures) = partition ((/= 0) . thd'') captures
       capturedCount = sum $ map thd'' realCaptures
       freedCount = sum $ map fth'' realCaptures
-      newEmptyBase = concatMap snd'' emptyCaptures
+      newEmptyBase = filter (\pos' -> points field ! pos' == EmptyPoint) $ concatMap snd'' emptyCaptures
       realCaptured = concatMap snd'' realCaptures
       captureChain = mergeCaptureChains pos $ map fst'' realCaptures
       newScoreRed = if player == Red then scoreRed field + capturedCount else scoreRed field - freedCount

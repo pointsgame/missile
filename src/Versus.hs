@@ -15,6 +15,7 @@ import Player
 import Field
 import Bot
 import Rendering
+import GameWidget
 
 data GenMoveType = Simple | WithTime Int | WithComplexity Int
   deriving (Eq, Show, Read)
@@ -22,18 +23,17 @@ data GenMoveType = Simple | WithTime Int | WithComplexity Int
 data BeginPattern = Empty | Cross
   deriving (Eq, Show, Read)
 
+data GUIType = Full | Light | None
+  deriving (Eq, Show, Read)
+
 data Settings = Settings { width :: Int
                          , height :: Int
                          , genMoveType :: GenMoveType
                          , beginPattern :: BeginPattern
-                         , noGUI :: Bool
+                         , guiType :: GUIType
                          , path1 :: String
                          , path2 :: String
                          }
-
-data MainWindow = MainWindow { window :: Gtk.Window,
-                               drawingArea :: Gtk.DrawingArea
-                             }
 
 widthParser :: Parser Int
 widthParser = option auto $ long "width" <> short 'w' <> metavar "WIDTH" <> help "Field width" <> value 20
@@ -45,19 +45,23 @@ genMoveTypeParser :: Parser GenMoveType
 genMoveTypeParser =
   flag' Simple (long "simple" <> short 's' <> help "Use gen_move") <|>
   fmap WithTime (option auto $ long "time" <> short 't' <> metavar "TIME" <> help "Use gen_move_with_time") <|>
-  fmap WithComplexity (option auto $ long "complexity" <> short 'c' <> metavar "COMPLEXITY" <> help "Use gen_move_with_complexity")
+  fmap WithComplexity (option auto $ long "complexity" <> short 'c' <> metavar "COMPLEXITY" <> help "Use gen_move_with_complexity") <|>
+  pure Simple
 
 beginPatternParser :: Parser BeginPattern
 beginPatternParser = option auto $ long "pattern" <> short 'p' <> metavar "PATTERN" <> help "Begin pattern" <> value Cross
 
-noGUIParser :: Parser Bool
-noGUIParser = switch $ long "nogui" <> short 'n' <> help "Console mode"
+guiTypeParser :: Parser GUIType
+guiTypeParser =
+  flag' Light (long "light" <> short 'l' <> help "Draw only game field") <|>
+  flag' None (long "nogui" <> short 'n' <> help "Console mode") <|>
+  pure Full
 
 pathParser :: Parser String
 pathParser = strArgument $ metavar "BOT"
 
 settingsParser :: Parser Settings
-settingsParser = Settings <$> widthParser <*> heightParser <*> genMoveTypeParser <*> beginPatternParser <*> noGUIParser <*> pathParser <*> pathParser
+settingsParser = Settings <$> widthParser <*> heightParser <*> genMoveTypeParser <*> beginPatternParser <*> guiTypeParser <*> pathParser <*> pathParser
 
 drawSettings :: DrawSettings
 drawSettings = DrawSettings { dsHReflection = False
@@ -139,17 +143,6 @@ collectStatistics settings bot1 bot2 fieldsMVar rng redraw = collectStatistics' 
        putStrLn $ "Statistics: " ++ show newWins ++ "/" ++ show newDraws ++ "/" ++ show newDefeats
        collectStatistics' rng2 (not swap) newWins newDraws newDefeats
 
-mainWindowNew :: IO MainWindow
-mainWindowNew = do
-  window' <- Gtk.windowNew
-  drawingArea' <- Gtk.drawingAreaNew
-  Gtk.windowSetDefaultSize window' 800 600
-  window' `Gtk.set` [ Gtk.windowTitle := "Versus",
-                      Gtk.containerChild := drawingArea' ]
-  return MainWindow { window = window',
-                      drawingArea = drawingArea'
-                    }
-
 main :: IO ()
 main =
   do settings <- execParser $ info settingsParser (fullDesc <> progDesc "Plays games with one bot against other.")
@@ -157,24 +150,24 @@ main =
      bot2 <- Bot.run $ path2 settings
      rng <- getStdGen
      fieldsMVar <- newMVar [emptyField (width settings) (height settings)]
-     mainWindowMVar <- newEmptyMVar
-     unless (noGUI settings) $ void $ forkIO $ do
+     gameWidgetMVar <- newEmptyMVar
+     unless (guiType settings == None) $ void $ forkIO $ do
        Gtk.initGUI
-       mainWindow <- mainWindowNew
-       putMVar mainWindowMVar mainWindow
-       window mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ do
-         void $ takeMVar mainWindowMVar
+       mainWindow <- Gtk.windowNew
+       gameWidget <- gameWidgetNew (guiType settings == Light) (readMVar fieldsMVar) (return drawSettings)
+       Gtk.windowSetDefaultSize mainWindow 800 600
+       mainWindow `Gtk.set` [ Gtk.windowTitle := "Versus"
+                            , Gtk.containerChild := gameWidget
+                            ]
+       putMVar gameWidgetMVar gameWidget
+       mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ do
+         void $ takeMVar gameWidgetMVar
          Gtk.mainQuit
          return False
-       drawingArea mainWindow `Gtk.on` Gtk.draw $ do
-         fields <- liftIO $ readMVar fieldsMVar
-         width' <- liftIO $ Gtk.widgetGetAllocatedWidth $ drawingArea mainWindow
-         height' <- liftIO $ Gtk.widgetGetAllocatedHeight $ drawingArea mainWindow
-         draw drawSettings (fromIntegral width') (fromIntegral height') fields
-       Gtk.widgetShowAll $ window mainWindow
+       Gtk.widgetShowAll mainWindow
        Gtk.mainGUI
      collectStatistics settings bot1 bot2 fieldsMVar rng $ do
-       mainWindowMaybe <- tryReadMVar mainWindowMVar
-       case mainWindowMaybe of
-         Just mainWindow -> Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ drawingArea mainWindow
+       gameWidgetMaybe <- tryReadMVar gameWidgetMVar
+       case gameWidgetMaybe of
+         Just gameWidget -> Gtk.postGUIAsync $ Gtk.widgetQueueDraw gameWidget
          Nothing         -> return ()

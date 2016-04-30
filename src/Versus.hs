@@ -77,7 +77,7 @@ drawSettings = DrawSettings { dsHReflection = False
                             }
 
 gameOver :: Field -> Bool
-gameOver field = all (/= EmptyPoint) $ elems $ points field
+gameOver field = notElem EmptyPoint $ elems $ points field
 
 crossMoves :: Int -> Int -> [(Pos, Player)]
 crossMoves width' height' = [((width' `div` 2 - 1, height' `div` 2 - 1), Red),
@@ -154,7 +154,7 @@ main =
      unless (guiType settings == None) $ void $ forkIO $ do
        Gtk.initGUI
        mainWindow <- Gtk.windowNew
-       gameWidget <- gameWidgetNew (guiType settings == Light) (readMVar fieldsMVar) (return drawSettings)
+       gameWidget <- gameWidgetNew (guiType settings == Light) (readMVar fieldsMVar) (return drawSettings) (const $ return False)
        Gtk.windowSetDefaultSize mainWindow 800 600
        mainWindow `Gtk.set` [ Gtk.windowTitle := "Versus"
                             , Gtk.containerChild := gameWidget

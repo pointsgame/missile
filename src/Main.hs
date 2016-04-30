@@ -10,12 +10,12 @@ import Data.Colour.RGBSpace as Colour
 import Data.Colour.SRGB as SRGB
 import qualified Graphics.UI.Gtk as Gtk
 import Graphics.UI.Gtk (AttrOp((:=)))
-import Field
 import Settings
 import Game
 import GameWithBot
 import qualified FileFormats.XT as XT
 import Rendering
+import GameWidget
 import Auxiliary
 
 data MainWindow = MainWindow { mwWindow :: Gtk.Window
@@ -54,11 +54,6 @@ data PreferencesDialog = PreferencesDialog { pdDialog :: Gtk.Dialog
                                            , pdWithComplexityRadioButton :: Gtk.RadioButton
                                            , pdWithComplexitySpinButton :: Gtk.SpinButton
                                            }
-
-data GameTab = GameTab { gtWidget :: Gtk.Widget
-                       , gtDrawingArea :: Gtk.DrawingArea
-                       , gtCoordLabel :: Gtk.Label
-                       }
 
 rgbToGtkColor :: RGB Double -> Gtk.Color
 rgbToGtkColor (Colour.RGB r g b) =
@@ -282,63 +277,6 @@ runPreferencesDialog startSettings preferencesDialog f =
        Gtk.ResponseCancel      -> Gtk.widgetDestroy $ pdDialog preferencesDialog
        _                       -> error $ "preferencesDialog: unexpected response: " ++ show response
 
-gameTabNew :: IO GameTab
-gameTabNew =
-  do table <- Gtk.tableNew 2 1 False
-     drawingArea <- Gtk.drawingAreaNew
-     coordLabel <- Gtk.labelNew (Nothing :: Maybe [Char])
-     Gtk.tableAttachDefaults table drawingArea 0 1 0 1
-     Gtk.tableAttach table coordLabel 0 1 1 2 [] [] 1 1
-     return GameTab { gtWidget = Gtk.toWidget table
-                    , gtDrawingArea = drawingArea
-                    , gtCoordLabel = coordLabel
-                    }
-
-listenGameTab :: GameWithBot -> GameTab -> IO ()
-listenGameTab gwb gameTab =
-  do let withPos f =
-           do (x, y) <- Gtk.eventCoordinates
-              liftIO $ do game <- get (gwbGame gwb)
-                          width <- liftM fromIntegral $ liftIO $ Gtk.widgetGetAllocatedWidth $ gtDrawingArea gameTab
-                          height <- liftM fromIntegral $ liftIO $ Gtk.widgetGetAllocatedHeight $ gtDrawingArea gameTab
-                          let fields = gameFields game
-                              headField = head fields
-                              gameFieldWidth = fieldWidth headField
-                              gameFieldHeight = fieldHeight headField
-                              settings = gameSettings game
-                              horizontalReflection' = horizontalReflection settings
-                              verticalReflection' = verticalReflection settings
-                              (_, _, toGamePosX, toGamePosY) = fromToFieldPos horizontalReflection' verticalReflection' gameFieldWidth gameFieldHeight width height
-                              posX = toGamePosX x
-                              posY = toGamePosY y
-                          when (posX >= 0 && posY >= 0 && posX < gameFieldWidth && posY < gameFieldHeight) $ f (posX, posY)
-     gtDrawingArea gameTab `Gtk.on` Gtk.draw $
-       do game <- liftIO $ get (gwbGame gwb)
-          width <- liftIO $ Gtk.widgetGetAllocatedWidth $ gtDrawingArea gameTab
-          height <- liftIO $ Gtk.widgetGetAllocatedHeight $ gtDrawingArea gameTab
-          let settings = gameSettings game
-              drawSettings = DrawSettings { dsHReflection = horizontalReflection settings
-                                          , dsVReflection = verticalReflection settings
-                                          , dsGridThickness = gridThickness settings
-                                          , dsGridColor = gridColor settings
-                                          , dsBackgroundColor = backgroundColor settings
-                                          , dsRedColor = redColor settings
-                                          , dsBlackColor = blackColor settings
-                                          , dsPointRadius = pointRadius settings
-                                          , dsFillingAlpha = fillingAlpha settings
-                                          , dsFullFill = fullFill settings
-                                          }
-          draw drawSettings (fromIntegral width) (fromIntegral height) (gameFields game)
-     gtDrawingArea gameTab `Gtk.on` Gtk.buttonPressEvent $ Gtk.tryEvent $
-        do Gtk.LeftButton <- Gtk.eventButton
-           withPos $ \pos -> do putGWBPoint pos gwb
-                                Gtk.widgetQueueDraw $ gtDrawingArea gameTab
-     Gtk.widgetAddEvents (gtDrawingArea gameTab) [Gtk.PointerMotionMask]
-     gtDrawingArea gameTab `Gtk.on` Gtk.motionNotifyEvent $
-       do withPos $ \(posX, posY) -> Gtk.labelSetText (gtCoordLabel gameTab) $ show (posX + 1) ++ ":" ++ show (posY + 1)
-          return False
-     return ()
-
 mainWindowNew :: Gtk.Pixbuf -> IO MainWindow
 mainWindowNew logo =
   do -- Create widgets.
@@ -406,7 +344,21 @@ mainWindowNew logo =
                        , mwNotebook = notebook
                        }
 
-listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameTab, GameWithBot)) -> MainWindow -> Gtk.Pixbuf -> String -> IO ()
+toDrawSettings :: Settings -> DrawSettings
+toDrawSettings settings =
+  DrawSettings { dsHReflection = horizontalReflection settings
+               , dsVReflection = verticalReflection settings
+               , dsGridThickness = gridThickness settings
+               , dsGridColor = gridColor settings
+               , dsBackgroundColor = backgroundColor settings
+               , dsRedColor = redColor settings
+               , dsBlackColor = blackColor settings
+               , dsPointRadius = pointRadius settings
+               , dsFillingAlpha = fillingAlpha settings
+               , dsFullFill = fullFill settings
+               }
+
+listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (Gtk.Widget, GameWithBot)) -> MainWindow -> Gtk.Pixbuf -> String -> IO ()
 listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
   let onExit =
         do tabs <- get tabsRef
@@ -424,11 +376,12 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
            Gtk.widgetDestroy messageDialog
       createGameTab notebook gwb =
         do game <- get (gwbGame gwb)
-           gameTab <- gameTabNew
-           let gwb' = gwb { gwbUpdated = Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ gtDrawingArea gameTab }
-           listenGameTab gwb' gameTab
-           pageIndex <- Gtk.notebookAppendPage notebook (gtWidget gameTab) (gameName $ gameSettings game)
-           modifyIORef tabsRef $ IntMap.insert pageIndex (gameTab, gwb')
+           gameWidget <- gameWidgetNew False (fmap gameFields $ get $ gwbGame gwb) (fmap (toDrawSettings . gameSettings) $ get $ gwbGame gwb) $ \pos -> do
+             putGWBPoint pos gwb
+             return True
+           let gwb' = gwb { gwbUpdated = Gtk.postGUIAsync $ Gtk.widgetQueueDraw gameWidget }
+           pageIndex <- Gtk.notebookAppendPage notebook gameWidget (gameName $ gameSettings game)
+           modifyIORef tabsRef $ IntMap.insert pageIndex (gameWidget, gwb')
            Gtk.widgetShowAll notebook
            Gtk.notebookSetCurrentPage notebook pageIndex
   in do mwWindow mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ onExit >> return False
@@ -450,23 +403,23 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
                do tabs <- get tabsRef
-                  let (gameTab, gwb) = tabs IntMap.! pageNum
+                  let (gameWidget, gwb) = tabs IntMap.! pageNum
                   backGWB gwb
-                  Gtk.widgetQueueDraw $ gtDrawingArea gameTab
+                  Gtk.widgetQueueDraw gameWidget
         mwReflectHorizontallyMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
                do tabs <- get tabsRef
-                  let (gameTab, gwb) = tabs IntMap.! pageNum
+                  let (gameWidget, gwb) = tabs IntMap.! pageNum
                   reflectHorizontallyGWB gwb
-                  Gtk.widgetQueueDraw $ gtDrawingArea gameTab
+                  Gtk.widgetQueueDraw gameWidget
         mwReflectVerticallyMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
                do tabs <- get tabsRef
-                  let (gameTab, gwb) = tabs IntMap.! pageNum
+                  let (gameWidget, gwb) = tabs IntMap.! pageNum
                   reflectVerticallyGWB gwb
-                  Gtk.widgetQueueDraw $ gtDrawingArea gameTab
+                  Gtk.widgetQueueDraw gameWidget
         mwOpenImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mwWindow mainWindow)) Gtk.FileChooserActionOpen [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]
              fileChooser `Gtk.set` [Gtk.windowTitle := "Choose save of game"]
@@ -520,15 +473,15 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              if pageNum /= -1
                then do tabs <- get tabsRef
-                       let (gameTab, gwb) = tabs IntMap.! pageNum
+                       let (gameWidget, gwb) = tabs IntMap.! pageNum
                        game <- get (gwbGame gwb)
                        let settings = gameSettings game
                        preferencesDialog <- preferencesDialogNew mainWindow settings
                        runPreferencesDialog settings preferencesDialog $ \newSettings ->
                          do updateGWBSettings gwb newSettings
-                            Gtk.notebookSetTabLabelText (mwNotebook mainWindow) (gtWidget gameTab) (gameName newSettings)
+                            Gtk.notebookSetTabLabelText (mwNotebook mainWindow) gameWidget (gameName newSettings)
                             game' <- get (gwbGame gwb)
-                            modifyIORef tabsRef $ IntMap.insert pageNum (gameTab, gwb { gwbBotError = botErrorAlert game' (mwWindow mainWindow) })
+                            modifyIORef tabsRef $ IntMap.insert pageNum (gameWidget, gwb { gwbBotError = botErrorAlert game' (mwWindow mainWindow) })
                             return ()
                else do globalSettings <- get globalSettingsRef
                        preferencesDialog <- preferencesDialogNew mainWindow globalSettings

@@ -41,14 +41,19 @@ toPosXY reflection areaSize fieldSize x =
 shift :: Double -> Double -> Double
 shift size balancedSize = (size - balancedSize) / 2
 
-fromToFieldPos :: Bool -> Bool -> Int -> Int -> Double -> Double -> (Int -> Double, Int -> Double, Double -> Int, Double -> Int)
-fromToFieldPos hReflection vReflection fieldWidth' fieldHeight' width height =
+dimensions :: Int -> Int -> Double -> Double -> (Double, Double, Double, Double)
+dimensions fieldWidth' fieldHeight' width height =
   let fieldHeight'' = fromIntegral fieldHeight'
       fieldWidth'' = fromIntegral fieldWidth'
       width' = min width $ height / fieldHeight'' * fieldWidth''
       height' = min height $ width / fieldWidth'' * fieldHeight''
       shiftX = shift width width'
       shiftY = shift height height'
+  in (width', height', shiftX, shiftY)
+
+fromToFieldPos :: Bool -> Bool -> Int -> Int -> Double -> Double -> (Int -> Double, Int -> Double, Double -> Int, Double -> Int)
+fromToFieldPos hReflection vReflection fieldWidth' fieldHeight' width height =
+  let (width', height', shiftX, shiftY) = dimensions fieldWidth' fieldHeight' width height
   in ( (shiftX +) . fromPosXY hReflection width' fieldWidth' -- fromGamePosX
      , (shiftY +) . fromPosXY (not vReflection) height' fieldHeight' -- fromGamePosY
      , \coordX -> toPosXY hReflection width' fieldWidth' (coordX - shiftX) -- toGamePosX
@@ -82,12 +87,8 @@ draw DrawSettings { dsHReflection = hReflection
   do let headField = head fields
          fieldWidth' = fieldWidth headField
          fieldHeight' = fieldHeight headField
-         fieldWidth'' = fromIntegral fieldWidth'
-         fieldHeight'' = fromIntegral fieldHeight'
-         width' = min width $ height / fieldHeight'' * fieldWidth''
-         height' = min height $ width / fieldWidth'' * fieldHeight''
-         shiftX = shift width width'
-         shiftY = shift height height'
+         (width', height', shiftX, shiftY) = dimensions fieldWidth' fieldHeight' width height
+         scale = width' / fromIntegral fieldWidth'
          (fromPosX, fromPosY, _, _) = fromToFieldPos hReflection vReflection fieldWidth' fieldHeight' width height
          fromPos (x, y) = (fromPosX x, fromPosY y)
          verticalLines = [fromPosX i | i <- [0 .. (fieldWidth headField - 1)]]
@@ -110,13 +111,13 @@ draw DrawSettings { dsHReflection = hReflection
      Cairo.setAntialias Cairo.AntialiasBest
      mapM_ (\((x, y), player) ->
        do setSourceRGB $ if player == Red then redColor else blackColor
-          Cairo.arc (fromPosX x) (fromPosY y) (pointRadius * width' / fieldWidth'' / 5) 0 (2 * pi)
+          Cairo.arc (fromPosX x) (fromPosY y) (pointRadius * scale / 5) 0 (2 * pi)
           Cairo.fill) $ moves headField
      --Rendering last point.
      unless (null $ moves headField) $ (\((x, y), player) ->
        do Cairo.setLineWidth 2
           setSourceRGB $ if player == Red then redColor else blackColor
-          Cairo.arc (fromPosX x) (fromPosY y) (pointRadius * width' / fieldWidth'' / 3) 0 (2 * pi)
+          Cairo.arc (fromPosX x) (fromPosY y) (pointRadius * scale / 3) 0 (2 * pi)
           Cairo.stroke) $ head $ moves headField
      --Rendering little surrounds.
      Cairo.setAntialias Cairo.AntialiasNone

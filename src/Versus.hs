@@ -154,10 +154,10 @@ main =
      unless (guiType settings == None) $ void $ forkIO $ do
        Gtk.initGUI
        mainWindow <- Gtk.windowNew
-       gameWidget <- gameWidgetNew (guiType settings == Light) (readMVar fieldsMVar) (return drawSettings) (const $ return False)
+       gameWidget <- gameWidgetNew (guiType settings == Light) (readMVar fieldsMVar) (return drawSettings)
        Gtk.windowSetDefaultSize mainWindow 800 600
        mainWindow `Gtk.set` [ Gtk.windowTitle := "Versus"
-                            , Gtk.containerChild := gameWidget
+                            , Gtk.containerChild := toWidget gameWidget
                             ]
        putMVar gameWidgetMVar gameWidget
        mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ do
@@ -169,5 +169,5 @@ main =
      collectStatistics settings bot1 bot2 fieldsMVar rng $ do
        gameWidgetMaybe <- tryReadMVar gameWidgetMVar
        case gameWidgetMaybe of
-         Just gameWidget -> Gtk.postGUIAsync $ Gtk.widgetQueueDraw gameWidget
+         Just gameWidget -> Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ toWidget gameWidget
          Nothing         -> return ()

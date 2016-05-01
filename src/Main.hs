@@ -358,7 +358,7 @@ toDrawSettings settings =
                , dsFullFill = fullFill settings
                }
 
-listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (Gtk.Widget, GameWithBot)) -> MainWindow -> Gtk.Pixbuf -> String -> IO ()
+listenMainWindow :: IORef Settings -> IORef (IntMap.IntMap (GameWidget, GameWithBot)) -> MainWindow -> Gtk.Pixbuf -> String -> IO ()
 listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
   let onExit =
         do tabs <- get tabsRef
@@ -376,11 +376,12 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
            Gtk.widgetDestroy messageDialog
       createGameTab notebook gwb =
         do game <- get (gwbGame gwb)
-           gameWidget <- gameWidgetNew False (fmap gameFields $ get $ gwbGame gwb) (fmap (toDrawSettings . gameSettings) $ get $ gwbGame gwb) $ \pos -> do
-             putGWBPoint pos gwb
-             return True
-           let gwb' = gwb { gwbUpdated = Gtk.postGUIAsync $ Gtk.widgetQueueDraw gameWidget }
-           pageIndex <- Gtk.notebookAppendPage notebook gameWidget (gameName $ gameSettings game)
+           gameWidget <- gameWidgetNew False (fmap gameFields $ get $ gwbGame gwb) (fmap (toDrawSettings . gameSettings) $ get $ gwbGame gwb)
+           let gwb' = gwb { gwbUpdated = Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ toWidget gameWidget }
+           onClick gameWidget $ \pos -> do
+             putGWBPoint pos gwb'
+             Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ toWidget gameWidget
+           pageIndex <- Gtk.notebookAppendPage notebook (toWidget gameWidget) (gameName $ gameSettings game)
            modifyIORef tabsRef $ IntMap.insert pageIndex (gameWidget, gwb')
            Gtk.widgetShowAll notebook
            Gtk.notebookSetCurrentPage notebook pageIndex
@@ -405,21 +406,21 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
                do tabs <- get tabsRef
                   let (gameWidget, gwb) = tabs IntMap.! pageNum
                   backGWB gwb
-                  Gtk.widgetQueueDraw gameWidget
+                  Gtk.widgetQueueDraw $ toWidget gameWidget
         mwReflectHorizontallyMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
                do tabs <- get tabsRef
                   let (gameWidget, gwb) = tabs IntMap.! pageNum
                   reflectHorizontallyGWB gwb
-                  Gtk.widgetQueueDraw gameWidget
+                  Gtk.widgetQueueDraw $ toWidget gameWidget
         mwReflectVerticallyMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do pageNum <- Gtk.notebookGetCurrentPage (mwNotebook mainWindow)
              when (pageNum /= -1) $
                do tabs <- get tabsRef
                   let (gameWidget, gwb) = tabs IntMap.! pageNum
                   reflectVerticallyGWB gwb
-                  Gtk.widgetQueueDraw gameWidget
+                  Gtk.widgetQueueDraw $ toWidget gameWidget
         mwOpenImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $
           do fileChooser <- Gtk.fileChooserDialogNew Nothing (Just (mwWindow mainWindow)) Gtk.FileChooserActionOpen [("Cancel", Gtk.ResponseCancel), ("OK", Gtk.ResponseOk)]
              fileChooser `Gtk.set` [Gtk.windowTitle := "Choose save of game"]
@@ -479,7 +480,7 @@ listenMainWindow globalSettingsRef tabsRef mainWindow logo license =
                        preferencesDialog <- preferencesDialogNew mainWindow settings
                        runPreferencesDialog settings preferencesDialog $ \newSettings ->
                          do updateGWBSettings gwb newSettings
-                            Gtk.notebookSetTabLabelText (mwNotebook mainWindow) gameWidget (gameName newSettings)
+                            Gtk.notebookSetTabLabelText (mwNotebook mainWindow) (toWidget gameWidget) (gameName newSettings)
                             game' <- get (gwbGame gwb)
                             modifyIORef tabsRef $ IntMap.insert pageNum (gameWidget, gwb { gwbBotError = botErrorAlert game' (mwWindow mainWindow) })
                             return ()

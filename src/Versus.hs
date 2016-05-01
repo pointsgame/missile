@@ -106,8 +106,8 @@ playBotMoves bot = mapM_ $ uncurry (Bot.play bot)
 playFieldMoves :: [Field] -> [(Pos, Player)] -> [Field]
 playFieldMoves = foldl $ \fields' (pos, player) -> putPoint pos player (head fields') : fields'
 
-playGame :: RandomGen g => Settings -> Bot -> Bot -> MVar [Field] -> g -> Bool -> IO () -> IO (Maybe Player)
-playGame settings bot1 bot2 fieldsMVar rng swap redraw =
+playGame :: RandomGen g => Settings -> Bot -> Bot -> g -> Bool -> ([Field] -> IO ()) -> IO (Maybe Player)
+playGame settings bot1 bot2 rng swap redraw =
   do let (seed1, rng') = next rng
          (seed2, _) = next rng'
      Bot.init bot1 (width settings) (height settings) seed1
@@ -121,8 +121,7 @@ playGame settings bot1 bot2 fieldsMVar rng swap redraw =
                              playBotMoves bot1 moves'
                              playBotMoves bot2 moves'
                              return $ playFieldMoves [emptyField'] moves'
-     void $ swapMVar fieldsMVar fields
-     redraw
+     redraw fields
      playGame' fields Red where
        playGame' [] _ = error "Internal error."
        playGame' (fields @ (field : _)) player | gameOver field = do putStrLn $ "Game is done! Red score is " ++ show (scoreRed field) ++ ". Black score is " ++ show (scoreBlack field) ++ "."
@@ -140,8 +139,7 @@ playGame settings bot1 bot2 fieldsMVar rng swap redraw =
             putStrLn $ "Red score is " ++ show (scoreRed field) ++ ". Black score is " ++ show (scoreBlack field) ++ ". Next move is " ++ show pos ++ ", player is " ++ show player ++ "."
             unless (isPuttingAllowed field pos) $ error "This move is invalid!"
             let nextFields = putPoint pos player field : fields
-            void $ swapMVar fieldsMVar nextFields
-            redraw
+            redraw fields
             Bot.play bot1 pos player
             Bot.play bot2 pos player
             playGame' nextFields $ nextPlayer player
@@ -151,7 +149,7 @@ collectStatistics settings bot1 bot2 fieldsMVar rng redraw = collectStatistics' 
   collectStatistics' :: RandomGen g => g -> Bool -> Int -> Int -> Int -> IO ()
   collectStatistics' rng' swap wins draws defeats =
     do let (rng1, rng2) = split rng'
-       result <- playGame settings bot1 bot2 fieldsMVar rng1 swap redraw
+       result <- playGame settings bot1 bot2 rng1 swap (\fields -> swapMVar fieldsMVar fields >> redraw)
        let newWins = if result == Just Red && not swap || result == Just Black && swap then wins + 1 else wins
            newDraws = if isNothing result then draws + 1 else draws
            newDefeats = if result == Just Black && not swap || result == Just Red && swap then defeats + 1 else defeats

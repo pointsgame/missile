@@ -31,6 +31,7 @@ data Settings = Settings { width :: Int
                          , genMoveType :: GenMoveType
                          , beginPattern :: BeginPattern
                          , guiType :: GUIType
+                         , gamesCount :: Maybe Int
                          , path1 :: String
                          , path2 :: String
                          }
@@ -57,11 +58,25 @@ guiTypeParser =
   flag' None (long "nogui" <> short 'n' <> help "Console mode") <|>
   pure Full
 
+gamesCountParser :: Parser (Maybe Int)
+gamesCountParser =
+  fmap Just (option auto $ long "games" <> short 'g' <> metavar "GAMES" <> help "Games count") <|>
+  pure Nothing
+
 pathParser :: Parser String
 pathParser = strArgument $ metavar "BOT"
 
 settingsParser :: Parser Settings
-settingsParser = Settings <$> widthParser <*> heightParser <*> genMoveTypeParser <*> beginPatternParser <*> guiTypeParser <*> pathParser <*> pathParser
+settingsParser =
+  Settings <$>
+  widthParser <*>
+  heightParser <*>
+  genMoveTypeParser <*>
+  beginPatternParser <*>
+  guiTypeParser <*>
+  gamesCountParser <*>
+  pathParser <*>
+  pathParser
 
 drawSettings :: DrawSettings
 drawSettings = DrawSettings { dsHReflection = False
@@ -141,7 +156,16 @@ collectStatistics settings bot1 bot2 fieldsMVar rng redraw = collectStatistics' 
            newDraws = if isNothing result then draws + 1 else draws
            newDefeats = if result == Just Black && not swap || result == Just Red && swap then defeats + 1 else defeats
        putStrLn $ "Statistics: " ++ show newWins ++ "/" ++ show newDraws ++ "/" ++ show newDefeats
-       collectStatistics' rng2 (not swap) newWins newDraws newDefeats
+       if maybe True (<= wins + draws + defeats) (gamesCount settings)
+         then collectStatistics' rng2 (not swap) newWins newDraws newDefeats
+         else do quit bot1
+                 quit bot2
+
+forkThread :: IO () -> IO (MVar ())
+forkThread p = do
+  handle <- newEmptyMVar
+  void $ forkFinally p $ const $ putMVar handle ()
+  return handle
 
 main :: IO ()
 main =
@@ -151,23 +175,29 @@ main =
      rng <- getStdGen
      fieldsMVar <- newMVar [emptyField (width settings) (height settings)]
      gameWidgetMVar <- newEmptyMVar
-     unless (guiType settings == None) $ void $ forkIO $ do
-       Gtk.initGUI
-       mainWindow <- Gtk.windowNew
-       gameWidget <- gameWidgetNew (guiType settings == Light) (readMVar fieldsMVar) (return drawSettings)
-       Gtk.windowSetDefaultSize mainWindow 800 600
-       mainWindow `Gtk.set` [ Gtk.windowTitle := "Versus"
-                            , Gtk.containerChild := toWidget gameWidget
-                            ]
-       putMVar gameWidgetMVar gameWidget
-       mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ do
+     threadMVar <- if guiType settings /= None
+       then forkThread $ do
+         Gtk.initGUI
+         mainWindow <- Gtk.windowNew
+         gameWidget <- gameWidgetNew (guiType settings == Light) (readMVar fieldsMVar) (return drawSettings)
+         Gtk.windowSetDefaultSize mainWindow 800 600
+         mainWindow `Gtk.set` [ Gtk.windowTitle := "Versus"
+                              , Gtk.containerChild := toWidget gameWidget
+                              ]
+         putMVar gameWidgetMVar gameWidget
+         mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ do
+           Gtk.mainQuit
+           return False
+         Gtk.widgetShowAll mainWindow
+         Gtk.mainGUI
          void $ takeMVar gameWidgetMVar
-         Gtk.mainQuit
-         return False
-       Gtk.widgetShowAll mainWindow
-       Gtk.mainGUI
+       else newMVar ()
      collectStatistics settings bot1 bot2 fieldsMVar rng $ do
        gameWidgetMaybe <- tryReadMVar gameWidgetMVar
        case gameWidgetMaybe of
          Just gameWidget -> Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ toWidget gameWidget
          Nothing         -> return ()
+     isGUIRunning <- isEmptyMVar threadMVar
+     when isGUIRunning $ do
+       Gtk.postGUIAsync Gtk.mainQuit
+       takeMVar threadMVar

@@ -11,7 +11,7 @@ playerWidth :: Int
 playerWidth = 6
 
 posWidth :: Int
-posWidth = 8
+posWidth = 7
 
 scoreWidth :: Int
 scoreWidth = 7

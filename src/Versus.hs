@@ -146,7 +146,7 @@ playGame settings bot1 bot2 rng firstPlayer redraw =
             let nextFields = putPoint pos player field : fields
             when (verbose settings) $
               putStrLn $ VT.row player pos (scoreRed $ head nextFields) (scoreBlack $ head nextFields)
-            redraw fields
+            redraw nextFields
             Bot.play bot1 pos player
             Bot.play bot2 pos player
             playGame' nextFields $ nextPlayer player

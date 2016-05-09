@@ -9,6 +9,7 @@ import Player
 import Field
 import Game
 import Bot
+import AsyncBot
 
 data GameWithBot = GameWithBot { gwbGame :: IORef Game
                                , gwbBot :: IORef (Maybe Bot)
@@ -20,11 +21,11 @@ data GameWithBot = GameWithBot { gwbGame :: IORef Game
 loadBot :: Game -> IO () -> (Bot -> IO ()) -> IO ()
 loadBot game callbackError callback =
     let settings = gameSettings game
-    in void $ safeRun (aiPath settings) callbackError $ \bot ->
-           void $ safeInit bot (gameWidth settings) (gameHeight settings) 0 callbackError $
+    in void $ asyncRun (aiPath settings) callbackError $ \bot ->
+           void $ asyncInit bot (gameWidth settings) (gameHeight settings) 0 callbackError $
                if length (gameFields game) == 1
                then callback bot
-               else void $ safePlayMany bot (reverse $ moves $ head $ gameFields game) callbackError (callback bot)
+               else void $ asyncPlayMany bot (reverse $ moves $ head $ gameFields game) callbackError (callback bot)
 
 loadGWBBot :: GameWithBot -> IO ()
 loadGWBBot gwb =
@@ -43,7 +44,7 @@ killGWBBot gwb =
     do botMaybe <- get (gwbBot gwb)
        case botMaybe of
          Nothing  -> return ()
-         Just bot -> do safeQuit bot
+         Just bot -> do asyncStop bot 200
                         gwbBot gwb $= Nothing
 
 reloadGWBBot :: GameWithBot -> IO ()
@@ -84,17 +85,17 @@ putGWBPlayersPoint' game pos player gwb =
          Just bot -> do gwbBusy gwb $= True
                         gwbGame gwb $= game'
                         gwbUpdated gwb
-                        void $ safePlay bot pos player (botError gwb) $
+                        void $ asyncPlay bot pos player (botError gwb) $
                                 if aiRespondent settings
                                 then let gen = case aiGenMoveType settings of
-                                                 Simple                    -> safeGenMove bot player'
-                                                 WithTime time             -> safeGenMoveWithTime bot player' time
-                                                 WithComplexity complexity -> safeGenMoveWithComplexity bot player' complexity
+                                                 Simple                    -> asyncGenMove bot player'
+                                                 WithTime time             -> asyncGenMoveWithTime bot player' time
+                                                 WithComplexity complexity -> asyncGenMoveWithComplexity bot player' complexity
                                      in void $ gen (botError gwb) $ \pos' -> do
                                             let game'' = putGamePlayersPoint pos' player' game'
                                             gwbGame gwb $= game''
                                             gwbUpdated gwb
-                                            void $ safePlay bot pos' player' (botError gwb) $
+                                            void $ asyncPlay bot pos' player' (botError gwb) $
                                                 gwbBusy gwb $= False
                                 else gwbBusy gwb $= False
 
@@ -123,7 +124,7 @@ backGWB gwb =
                           gwbUpdated gwb
            Just bot -> do gwbBusy gwb $= True
                           gwbGame gwb $= backGame game
-                          void $ safeUndo bot (botError gwb) $
+                          void $ asyncUndo bot (botError gwb) $
                             do gwbBusy gwb $= False
                                gwbUpdated gwb
 

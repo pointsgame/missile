@@ -21,11 +21,6 @@ count p (x : xs) | p x       = 1 + count p xs
 leftShift1 :: [a] -> [a]
 leftShift1 list = tail list ++ [head list]
 
-replaceSingle :: (a -> Bool) -> (a -> a) -> [a] -> [a]
-replaceSingle _ _ [] = error "replaceSingle: not found."
-replaceSingle f g (h : t) | f h       = g h : t
-                          | otherwise = h : replaceSingle f g t
-
 padRight :: a -> Int -> [a] -> [a]
 padRight c n s | length s >= n = s
                | otherwise     = s ++ replicate (n - length s) c

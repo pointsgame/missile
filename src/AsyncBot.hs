@@ -26,9 +26,11 @@ asyncRun path callbackError callback =
       Left _    -> callbackError
       Right bot -> callback bot
 
-asyncStop :: Bot -> Int -> IO ThreadId
-asyncStop bot delay =
-  forkIO $ stop bot delay
+asyncStop :: Bot -> Int -> IO () -> IO ThreadId
+asyncStop bot delay callback =
+  forkIO $ do
+    stop bot delay
+    callback
 
 asyncListCommands :: Bot -> IO () -> ([String] -> IO ()) -> IO ThreadId
 asyncListCommands bot callbackError callback =
@@ -109,4 +111,3 @@ asyncPlayMany bot moves' callbackError callback =
     case answerEither of
       Left _  -> callbackError
       Right _ -> callback
-

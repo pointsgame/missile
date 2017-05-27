@@ -3,6 +3,7 @@ module Rendering ( fromToFieldPos
                  , DrawSettings(..)
                  ) where
 
+import Data.Default
 import Data.Maybe
 import Control.Monad
 import Data.Colour.RGBSpace as Colour
@@ -21,6 +22,19 @@ data DrawSettings = DrawSettings { dsHReflection :: Bool
                                  , dsFillingAlpha :: Double
                                  , dsFullFill :: Bool
                                  }
+
+instance Default DrawSettings where
+  def = DrawSettings { dsHReflection = False
+                     , dsVReflection = False
+                     , dsGridThickness = 1
+                     , dsGridColor  = RGB 0.3 0.3 0.3
+                     , dsBackgroundColor = RGB 1 1 1
+                     , dsRedColor = RGB 1 0 0
+                     , dsBlackColor = RGB 0 0 0
+                     , dsPointRadius = 1
+                     , dsFillingAlpha = 0.5
+                     , dsFullFill = True
+                     }
 
 fromPosXY :: Bool -> Double -> Int -> Int -> Double
 fromPosXY reflection areaSize fieldSize x =

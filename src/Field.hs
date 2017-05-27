@@ -1,4 +1,25 @@
-module Field where
+module Field ( Pos
+             , n
+             , s
+             , w
+             , e
+             , nw
+             , ne
+             , sw
+             , se
+             , Field
+             , scoreRed
+             , scoreBlack
+             , moves
+             , lastSurroundChain
+             , fieldWidth
+             , fieldHeight
+             , fieldIsFull
+             , isPuttingAllowed
+             , isPlayer
+             , emptyField
+             , putPoint
+             ) where
 
 import Data.Array
 import Data.List
@@ -45,6 +66,19 @@ data Field = Field { scoreRed :: Int
                    , lastSurroundChain :: Maybe ([Pos], Player)
                    , points :: Array Pos Point
                    }
+
+fieldWidth :: Field -> Int
+fieldWidth field =
+  let ((x1, _), (x2, _)) = bounds (points field)
+  in x2 - x1 + 1
+
+fieldHeight :: Field -> Int
+fieldHeight field =
+  let ((_, y1), (_, y2)) = bounds (points field)
+  in y2 - y1 + 1
+
+fieldIsFull :: Field -> Bool
+fieldIsFull = notElem EmptyPoint . elems . points
 
 isInField :: Field -> Pos -> Bool
 isInField = inRange . bounds . points
@@ -261,13 +295,3 @@ putPoint pos player field | not (isPuttingAllowed field pos) = error "putPos: pu
                   points = points field // ((pos, PlayerPoint player) :
                                             zip newEmptyBase (repeat $ EmptyBasePoint player) ++
                                             map (\pos' -> (pos', capture (points field ! pos') player)) realCaptured) }
-
-fieldWidth :: Field -> Int
-fieldWidth field =
-  let ((x1, _), (x2, _)) = bounds (points field)
-  in x2 - x1 + 1
-
-fieldHeight :: Field -> Int
-fieldHeight field =
-  let ((_, y1), (_, y2)) = bounds (points field)
-  in y2 - y1 + 1

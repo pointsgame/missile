@@ -18,7 +18,6 @@ data MainWindow = MainWindow { mwWindow :: Gtk.Window
                              , mwNewImageMenuItem :: Gtk.ImageMenuItem
                              , mwOpenImageMenuItem :: Gtk.ImageMenuItem
                              , mwSaveImageMenuItem :: Gtk.ImageMenuItem
-                             , mwCloseImageMenuItem :: Gtk.ImageMenuItem
                              , mwQuitImageMenuItem :: Gtk.ImageMenuItem
                              , mwUndoImageMenuItem :: Gtk.ImageMenuItem
                              , mwPreferencesImageMenuItem :: Gtk.ImageMenuItem
@@ -38,7 +37,6 @@ mainWindowNew logo = do
   newImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockNew
   openImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockOpen
   saveImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockSave
-  closeImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockClose
   fileSeparatorMenuItem <- Gtk.separatorMenuItemNew
   quitImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockQuit
   editImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockEdit
@@ -67,7 +65,6 @@ mainWindowNew logo = do
   Gtk.containerAdd fileMenu newImageMenuItem
   Gtk.containerAdd fileMenu openImageMenuItem
   Gtk.containerAdd fileMenu saveImageMenuItem
-  Gtk.containerAdd fileMenu closeImageMenuItem
   Gtk.containerAdd fileMenu fileSeparatorMenuItem
   Gtk.containerAdd fileMenu quitImageMenuItem
   Gtk.containerAdd menuBar editImageMenuItem
@@ -86,7 +83,6 @@ mainWindowNew logo = do
                     , mwNewImageMenuItem = newImageMenuItem
                     , mwOpenImageMenuItem = openImageMenuItem
                     , mwSaveImageMenuItem = saveImageMenuItem
-                    , mwCloseImageMenuItem = closeImageMenuItem
                     , mwQuitImageMenuItem = quitImageMenuItem
                     , mwUndoImageMenuItem = undoImageMenuItem
                     , mwPreferencesImageMenuItem = preferencesImageMenuItem

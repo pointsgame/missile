@@ -1,5 +1,5 @@
 name:                missile
-version:             3.0.0
+version:             4.0.0
 license:             AGPL-3
 license-file:        LICENSE.txt
 author:              kurnevsky
@@ -27,7 +27,6 @@ executable missile
                       data-default,
                       split,
                       transformers,
-                      --StateVar,
                       process,
                       --bytestring,
                       colour,

@@ -1,16 +1,10 @@
 module Main (main) where
 
--- import Data.Maybe
-import Control.Concurrent
 import Data.Monoid
-import Data.Default
 import Data.IORef
 import Control.Monad
 import Control.Monad.IO.Class
 import Options.Applicative
--- import Data.IORef
--- import Data.Colour.RGBSpace as Colour
--- import Data.Colour.SRGB as SRGB
 import qualified Graphics.UI.Gtk as Gtk
 import Graphics.UI.Gtk (AttrOp((:=)))
 import Field
@@ -123,15 +117,15 @@ updateCoordLabel coordLabel drawingArea field drawSettings x y =
 
 listenMainWindow :: MainWindow -> Gtk.Pixbuf -> String -> IORef DrawSettings -> IORef Game -> IO ()
 listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
-  mwWindow mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ do
+  _ <- mwWindow mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ do
     game <- liftIO $ readIORef gameIORef
     gameStopBots game 1000000 Gtk.mainQuit
     return False
-  mwQuitImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $ do
+  _ <- mwQuitImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $ do
     game <- liftIO $ readIORef gameIORef
     Gtk.widgetDestroy $ mwWindow mainWindow
     gameStopBots game 1000000 Gtk.mainQuit
-  mwAboutImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $ do
+  _ <- mwAboutImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $ do
     aboutDialog <- Gtk.aboutDialogNew
     aboutDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow
                           , Gtk.aboutDialogProgramName := "Missile"
@@ -141,16 +135,16 @@ listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
                           , Gtk.aboutDialogAuthors := ["Evgeny Kurnevsky"]
                           , Gtk.aboutDialogLogo := Just logo
                           ]
-    Gtk.dialogRun aboutDialog
+    _ <- Gtk.dialogRun aboutDialog
     Gtk.widgetDestroy aboutDialog
-  mwDrawingArea mainWindow `Gtk.on` Gtk.draw $ do
+  _ <- mwDrawingArea mainWindow `Gtk.on` Gtk.draw $ do
     drawSettings <- liftIO $ readIORef drawSettingsIORef
     game <- liftIO $ readIORef gameIORef
     fields <- liftIO $ gameFields game
     width' <- liftIO $ Gtk.widgetGetAllocatedWidth $ mwDrawingArea mainWindow
     height' <- liftIO $ Gtk.widgetGetAllocatedHeight $ mwDrawingArea mainWindow
     draw drawSettings (fromIntegral width') (fromIntegral height') fields
-  mwDrawingArea mainWindow `Gtk.on` Gtk.motionNotifyEvent $ do
+  _ <- mwDrawingArea mainWindow `Gtk.on` Gtk.motionNotifyEvent $ do
     (x, y) <- Gtk.eventCoordinates
     liftIO $ do
       drawSettings <- readIORef drawSettingsIORef
@@ -158,13 +152,13 @@ listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
       field <- fmap head $ gameFields game
       updateCoordLabel (mwCoordLabel mainWindow) (mwDrawingArea mainWindow) field drawSettings x y
     return False
-  mwCoordLabel mainWindow `Gtk.on` Gtk.draw $ liftIO $ do
+  _ <- mwCoordLabel mainWindow `Gtk.on` Gtk.draw $ liftIO $ do
     (x, y) <- Gtk.widgetGetPointer $ mwDrawingArea mainWindow
     drawSettings <- readIORef drawSettingsIORef
     game <- readIORef gameIORef
     field <- fmap head $ gameFields game
     updateCoordLabel (mwCoordLabel mainWindow) (mwDrawingArea mainWindow) field drawSettings (fromIntegral x) (fromIntegral y)
-  mwDrawingArea mainWindow `Gtk.on` Gtk.buttonPressEvent $ Gtk.tryEvent $ do
+  _ <- mwDrawingArea mainWindow `Gtk.on` Gtk.buttonPressEvent $ Gtk.tryEvent $ do
     Gtk.LeftButton <- Gtk.eventButton
     (x, y) <- Gtk.eventCoordinates
     liftIO $ do
@@ -177,7 +171,7 @@ listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
 main :: IO ()
 main = do
   cliArguments <- execParser $ info cliArgumentsParser (fullDesc <> progDesc "Points game.")
-  Gtk.initGUI
+  _ <- Gtk.initGUI
   logo <- Gtk.pixbufNewFromFile "Logo.png"
   license <- readFile "LICENSE.txt"
   mainWindow <- mainWindowNew logo

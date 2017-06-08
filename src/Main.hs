@@ -8,10 +8,8 @@ import Options.Applicative
 import qualified Graphics.UI.Gtk as Gtk
 import Graphics.UI.Gtk (AttrOp((:=)))
 import Field
-import GameTree
 import Game
 import Rendering
-import GameSettings
 import Cli
 
 data MainWindow = MainWindow { mwWindow :: Gtk.Window
@@ -171,11 +169,10 @@ main = do
   logo <- Gtk.pixbufNewFromFile "Logo.png"
   license <- readFile "LICENSE.txt"
   mainWindow <- mainWindowNew logo
-  let gameTree = emptyGameTree (gsWidth $ cliGameSettings cliArguments) (gsHeight $ cliGameSettings cliArguments)
-      callbackError = const $ return ()
+  let callbackError = const $ return ()
       callback = Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ mwDrawingArea mainWindow
-  game <- gameNew gameTree callbackError callback
-  gameInitBots game (gsRedBotPath $ cliGameSettings cliArguments) (gsBlackBotPath $ cliGameSettings cliArguments)
+  game <- gameNew (cliGameSettings cliArguments) callbackError callback
+  gameInitBots game
   gameIORef <- newIORef game
   drawSettingsIORef <- newIORef $ cliDawSettings cliArguments
   listenMainWindow mainWindow logo license drawSettingsIORef gameIORef

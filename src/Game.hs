@@ -14,10 +14,12 @@ import Control.Monad.Trans.Class
 import Player
 import Field
 import GameTree
+import GameSettings
 import Bot
 import ContBot
 
 data Game = Game { gGameTree :: IORef GameTree
+                 , gGameSettings :: IORef GameSettings
                  , gBusy :: IORef Bool
                  , gPause :: IORef Bool
                  , gRedBot :: IORef (Maybe Bot)
@@ -72,14 +74,33 @@ initBot gameTree path callbackError = do --todo callcc and continue in case of f
   contInit bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) 0 callbackError
   return bot
 
-gameNew :: GameTree -> (Player -> IO ()) -> IO () -> IO Game
-gameNew gameTree callbackError callback = do
+stopBots :: Game -> Int -> ContT () IO ()
+stopBots game delay = do
+  maybeRedBot <- lift $ readIORef $ gRedBot game
+  maybeBlackBot <- lift $ readIORef $ gBlackBot game
+  forM_ maybeRedBot (flip contStop delay) *> forM_ maybeBlackBot (flip contStop delay)
+  lift $ writeIORef (gRedBot game) Nothing
+  lift $ writeIORef (gBlackBot game) Nothing
+
+initBots :: Game -> ContT () IO ()
+initBots game = do
+  gameSettings <- lift $ readIORef $ gGameSettings game
+  gameTree <- lift $ readIORef $ gGameTree game
+  maybeRedBot <- forM (gsRedBotPath gameSettings) $ flip (initBot gameTree) $ (gError game) Red
+  maybeBlackBot <- forM (gsBlackBotPath gameSettings) $ flip (initBot gameTree) $ (gError game) Black
+  lift $ writeIORef (gRedBot game) maybeRedBot
+  lift $ writeIORef (gBlackBot game) maybeBlackBot
+
+gameLoad :: GameTree -> GameSettings -> (Player -> IO ()) -> IO () -> IO Game
+gameLoad gameTree gameSettings callbackError callback = do
   gameTreeIORef <- newIORef gameTree
+  gameSettingsIORef <- newIORef gameSettings
   busyIORef <- newIORef False
   pauseIORef <- newIORef False
   redBotIORef <- newIORef Nothing
   blackBotIORef <- newIORef Nothing
   return Game { gGameTree = gameTreeIORef
+              , gGameSettings = gameSettingsIORef
               , gBusy = busyIORef
               , gPause = pauseIORef
               , gRedBot = redBotIORef
@@ -88,17 +109,18 @@ gameNew gameTree callbackError callback = do
               , gError = callbackError
               }
 
-gameInitBots :: Game -> Maybe String -> Maybe String -> IO ()
-gameInitBots game maybeRedBotPath maybeBlackBotPath =
+gameNew :: GameSettings -> (Player -> IO ()) -> IO () -> IO Game
+gameNew gameSettings =
+  let gameTree = emptyGameTree (gsWidth gameSettings) (gsHeight gameSettings)
+  in gameLoad gameTree gameSettings
+
+gameInitBots :: Game -> IO ()
+gameInitBots game =
   evalContT $ callCC $ \exit -> do
     busy <- lift $ readIORef $ gBusy game
     when busy $ exit ()
     lift $ writeIORef (gBusy game) True
-    gameTree <- lift $ readIORef $ gGameTree game
-    maybeRedBot <- forM maybeRedBotPath $ flip (initBot gameTree) $ (gError game) Red
-    maybeBlackBot <- forM maybeBlackBotPath $ flip (initBot gameTree) $ (gError game) Black
-    lift $ writeIORef (gRedBot game) maybeRedBot
-    lift $ writeIORef (gBlackBot game) maybeBlackBot
+    initBots game
     gamePlayLoop game
     lift $ writeIORef (gBusy game) False
 
@@ -131,10 +153,6 @@ gameStopBots :: Game -> Int -> IO () -> IO ()
 gameStopBots game delay callback =
   evalContT $ do
     lift $ writeIORef (gBusy game) True
-    maybeRedBot <- lift $ readIORef $ gRedBot game
-    maybeBlackBot <- lift $ readIORef $ gBlackBot game
-    forM_ maybeRedBot (flip contStop delay) *> forM_ maybeBlackBot (flip contStop delay)
-    lift $ writeIORef (gRedBot game) Nothing
-    lift $ writeIORef (gBlackBot game) Nothing
+    stopBots game delay
     lift $ writeIORef (gBusy game) False
     lift $ callback

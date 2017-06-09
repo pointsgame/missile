@@ -2,6 +2,7 @@ module GameTree ( GameTree(..)
                 , isGameTreePuttingAllowed
                 , selectGameTreeFields
                 , emptyGameTree
+                , buildGameTree
                 , putGameTreePlayersPoint
                 , putGameTreePoint
                 , gameTreeBack
@@ -12,6 +13,7 @@ module GameTree ( GameTree(..)
                 ) where
 
 import Data.List
+import Data.Maybe
 import Data.Tree
 import Player
 import Field
@@ -43,6 +45,19 @@ emptyGameTree width height =
   in GameTree { gtCurPlayer = Red
               , gtFields = [field]
               , gtTree = Node field []
+              }
+
+unfoldFunction :: [Field] -> (Field, [[Field]])
+unfoldFunction [] = error "unfoldFunction: can't unfold empty list of fields."
+unfoldFunction [field] = (field, [])
+unfoldFunction (field : t) = (field, [t])
+
+buildGameTree :: [Field] -> GameTree
+buildGameTree fields =
+  let curPlayer = maybe Red (nextPlayer . snd) $ listToMaybe $ moves $ head fields
+  in GameTree { gtCurPlayer = curPlayer
+              , gtFields = fields
+              , gtTree = unfoldTree unfoldFunction (reverse fields)
               }
 
 updateGameTree :: [Field] -> Tree Field -> Tree Field

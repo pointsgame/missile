@@ -68,10 +68,15 @@ gamePlayLoop game =
       gameBotsPutPoint game pos player
       gamePlayLoop game
 
+playBotMoves :: Bot -> [(Pos, Player)] -> IO () -> ContT () IO ()
+playBotMoves bot moves callbackError =
+  forM_ moves $ \(pos, player) -> contPlay bot pos player callbackError
+
 initBot :: GameTree -> String -> IO () -> ContT () IO Bot
-initBot gameTree path callbackError = do --todo callcc and continue in case of failure, kill failed bot, play start position
+initBot gameTree path callbackError = do --todo callcc and continue in case of failure, kill failed bot
   bot <- contRun path callbackError
   contInit bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) 0 callbackError
+  playBotMoves bot (moves $ head $ gtFields gameTree) callbackError
   return bot
 
 stopBots :: Game -> Int -> ContT () IO ()
@@ -90,6 +95,36 @@ initBots game = do
   maybeBlackBot <- forM (gsBlackBotPath gameSettings) $ flip (initBot gameTree) $ (gError game) Black
   lift $ writeIORef (gRedBot game) maybeRedBot
   lift $ writeIORef (gBlackBot game) maybeBlackBot
+
+unlessBusy :: IORef Bool -> ContT () IO () -> ContT () IO ()
+unlessBusy busyIORef c = do
+  busy <- lift $ readIORef busyIORef
+  unless busy c
+
+withBusy :: IORef Bool -> ContT () IO () -> ContT () IO ()
+withBusy busyIORef c = do
+  lift $ writeIORef busyIORef True
+  c
+  lift $ writeIORef busyIORef False
+
+crossMoves :: Int -> Int -> Player -> [(Pos, Player)]
+crossMoves width height player =
+  [ ((width `div` 2 - 1, height `div` 2 - 1), player)
+  , ((width `div` 2, height `div` 2 - 1), nextPlayer player)
+  , ((width `div` 2, height `div` 2), player)
+  , ((width `div` 2 - 1, height `div` 2), nextPlayer player)
+  ]
+
+playFieldMoves :: [Field] -> [(Pos, Player)] -> [Field]
+playFieldMoves = foldl $ \fields (pos, player) -> putPoint pos player (head fields) : fields
+
+beginPatternFields :: BeginPattern -> Player -> Int -> Int -> [Field]
+beginPatternFields Empty _ width height = [emptyField width height]
+beginPatternFields Cross player width height = playFieldMoves [emptyField width height] $ crossMoves width height player
+
+beginPatternGameTree :: BeginPattern -> Int -> Int -> GameTree
+beginPatternGameTree beginPattern width height =
+  buildGameTree $ beginPatternFields beginPattern Red width height
 
 gameLoad :: GameTree -> GameSettings -> (Player -> IO ()) -> IO () -> IO Game
 gameLoad gameTree gameSettings callbackError callback = do
@@ -111,7 +146,7 @@ gameLoad gameTree gameSettings callbackError callback = do
 
 gameNew :: GameSettings -> (Player -> IO ()) -> IO () -> IO Game
 gameNew gameSettings =
-  let gameTree = emptyGameTree (gsWidth gameSettings) (gsHeight gameSettings)
+  let gameTree = beginPatternGameTree (gsBeginPattern gameSettings) (gsWidth gameSettings) (gsHeight gameSettings)
   in gameLoad gameTree gameSettings
 
 gameInitBots :: Game -> IO ()
@@ -152,7 +187,5 @@ gamePutPoint game pos =
 gameStopBots :: Game -> Int -> IO () -> IO ()
 gameStopBots game delay callback =
   evalContT $ do
-    lift $ writeIORef (gBusy game) True
-    stopBots game delay
-    lift $ writeIORef (gBusy game) False
+    withBusy (gBusy game) $ stopBots game delay
     lift $ callback

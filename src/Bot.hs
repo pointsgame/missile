@@ -16,6 +16,7 @@ module Bot ( Bot
 import GHC.IO.Handle
 import System.IO
 import System.Process
+import System.Timeout
 import Control.Monad
 import Data.List.Split
 import Control.Concurrent
@@ -35,6 +36,12 @@ splitAnswer = filter (not . null) . splitOn " "
 botQuestion :: Bot -> String -> IO ()
 botQuestion bot question =
   hPutStrLn (stdInput bot) $ "0 " ++ question
+
+-- For some reason this doesn't work.
+-- botWait :: Bot -> Int -> IO ()
+-- botWait bot delay =
+--   do ready <- hWaitForInput (stdOutput bot) (delay / 1000)
+--      unless ready $ error $ "botWait: no answer from bot in " ++ show delay ++ " milliseconds."
 
 botAnswer :: Bot -> IO [String]
 botAnswer bot =
@@ -57,15 +64,15 @@ run path =
                 , processId = pid
                 }
 
-quit :: Bot -> IO ()
-quit bot =
+quit :: Bot -> Int -> IO ()
+quit bot delay =
   do botQuestion bot "quit"
-     ["quit"] <- botAnswer bot
+     Just ["quit"] <- timeout delay $ botAnswer bot
      return ()
 
 stop :: Bot -> Int -> IO ()
 stop bot delay =
-  do answerEither <- try (quit bot) :: IO (Either SomeException ())
+  do answerEither <- try (quit bot delay) :: IO (Either SomeException ())
      case answerEither of
        Left _  -> terminateProcess (processId bot)
        Right _ ->

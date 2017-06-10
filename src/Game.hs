@@ -8,6 +8,8 @@ module Game ( Game
             ) where
 
 import Data.IORef
+import Control.Concurrent
+import Control.Concurrent.MVar
 import Control.Monad
 import Control.Monad.Trans.Cont
 import Control.Monad.Trans.Class
@@ -27,6 +29,23 @@ data Game = Game { gGameTree :: IORef GameTree
                  , gCallback :: IO ()
                  , gError :: Player -> IO ()
                  }
+
+parallelC :: ContT () IO a -> ContT () IO b -> ContT () IO (a, b)
+parallelC c1 c2 = do
+  aMVar <- lift newEmptyMVar
+  bMVar <- lift newEmptyMVar
+  _ <- lift $ forkIO $ runContT c1 $ putMVar aMVar
+  _ <- lift $ forkIO $ runContT c2 $ putMVar bMVar
+  a <- lift $ takeMVar aMVar
+  b <- lift $ takeMVar bMVar
+  return (a, b)
+
+asyncC :: ContT () IO a -> ContT () IO a
+asyncC (ContT f) =
+  ContT $ void . forkIO . f
+
+parallelAsyncC :: ContT () IO a -> ContT () IO b -> ContT () IO (a, b)
+parallelAsyncC c1 c2 = asyncC $ parallelC c1 c2
 
 gameGameTree :: Game -> IO GameTree
 gameGameTree = readIORef . gGameTree
@@ -90,7 +109,9 @@ stopBots :: Game -> Int -> ContT () IO ()
 stopBots game delay = do
   maybeRedBot <- lift $ readIORef $ gRedBot game
   maybeBlackBot <- lift $ readIORef $ gBlackBot game
-  forM_ maybeRedBot (flip contStop delay) *> forM_ maybeBlackBot (flip contStop delay)
+  let c1 = forM_ maybeRedBot (flip contStop delay)
+      c2 = forM_ maybeBlackBot (flip contStop delay)
+  _ <- parallelAsyncC c1 c2
   lift $ writeIORef (gRedBot game) Nothing
   lift $ writeIORef (gBlackBot game) Nothing
 

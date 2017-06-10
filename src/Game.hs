@@ -40,6 +40,11 @@ gameBot game player =
     Red -> gRedBot game
     Black -> gBlackBot game
 
+genMoveByType :: GenMoveType -> Bot -> Player -> IO () -> ContT () IO Pos
+genMoveByType Simple bot player = contGenMove bot player
+genMoveByType (WithTime time) bot player = contGenMoveWithTime bot player time
+genMoveByType (WithComplexity complexity) bot player = contGenMoveWithComplexity bot player complexity
+
 gameBotsPutPoint :: Game -> Pos -> Player -> ContT () IO ()
 gameBotsPutPoint game pos player = do
   let continue = lift $ return ()
@@ -59,7 +64,9 @@ gamePlayLoop game =
       let player = gtCurPlayer gameTree
       maybeBot <- lift $ gameBot game player
       pos <- case maybeBot of
-        Just bot -> contGenMove bot player $ (gError game) player
+        Just bot -> do
+          gameSettings <- lift $ readIORef $ gGameSettings game
+          genMoveByType (gsGenMoveType gameSettings) bot player $ (gError game) player
         Nothing -> exit2 ()
       unless (isGameTreePuttingAllowed gameTree pos) $ (lift $ (gError game) player) >> exit1 ()
       let newGameTree = putGameTreePlayersPoint pos player gameTree

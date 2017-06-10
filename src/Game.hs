@@ -9,7 +9,6 @@ module Game ( Game
 
 import Data.IORef
 import Control.Concurrent
-import Control.Concurrent.MVar
 import Control.Monad
 import Control.Monad.Trans.Cont
 import Control.Monad.Trans.Class
@@ -66,11 +65,12 @@ genMoveByType (WithComplexity complexity) bot player = contGenMoveWithComplexity
 
 gameBotsPutPoint :: Game -> Pos -> Player -> ContT () IO ()
 gameBotsPutPoint game pos player = do
-  let continue = lift $ return ()
   maybeRedBot <- lift $ readIORef $ gRedBot game
-  maybe continue (\bot -> contPlay bot pos player $ (gError game) Red) maybeRedBot
   maybeBlackBot <- lift $ readIORef $ gBlackBot game
-  maybe continue (\bot -> contPlay bot pos player $ (gError game) Black) maybeBlackBot
+  let continue = lift $ return ()
+      c1 = maybe continue (\bot -> contPlay bot pos player $ (gError game) Red) maybeRedBot
+      c2 = maybe continue (\bot -> contPlay bot pos player $ (gError game) Black) maybeBlackBot
+  void $ parallelAsyncC c1 c2
 
 gamePlayLoop :: Game -> ContT () IO ()
 gamePlayLoop game =
@@ -95,8 +95,8 @@ gamePlayLoop game =
       gamePlayLoop game
 
 playBotMoves :: Bot -> [(Pos, Player)] -> IO () -> ContT () IO ()
-playBotMoves bot moves callbackError =
-  forM_ moves $ \(pos, player) -> contPlay bot pos player callbackError
+playBotMoves bot moves' callbackError =
+  forM_ moves' $ \(pos, player) -> contPlay bot pos player callbackError
 
 initBot :: GameTree -> String -> IO () -> ContT () IO Bot
 initBot gameTree path callbackError = do --todo callcc and continue in case of failure, kill failed bot
@@ -119,8 +119,9 @@ initBots :: Game -> ContT () IO ()
 initBots game = do
   gameSettings <- lift $ readIORef $ gGameSettings game
   gameTree <- lift $ readIORef $ gGameTree game
-  maybeRedBot <- forM (gsRedBotPath gameSettings) $ flip (initBot gameTree) $ (gError game) Red
-  maybeBlackBot <- forM (gsBlackBotPath gameSettings) $ flip (initBot gameTree) $ (gError game) Black
+  let c1 = forM (gsRedBotPath gameSettings) $ flip (initBot gameTree) $ (gError game) Red
+      c2 = forM (gsBlackBotPath gameSettings) $ flip (initBot gameTree) $ (gError game) Black
+  (maybeRedBot, maybeBlackBot) <- parallelAsyncC c1 c2
   lift $ writeIORef (gRedBot game) maybeRedBot
   lift $ writeIORef (gBlackBot game) maybeBlackBot
 

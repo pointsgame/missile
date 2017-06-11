@@ -136,6 +136,9 @@ withBusy busyIORef c = do
   c
   lift $ writeIORef busyIORef False
 
+unlessWithBusy :: IORef Bool -> ContT () IO () -> ContT () IO ()
+unlessWithBusy busyIORef = unlessBusy busyIORef . withBusy busyIORef
+
 crossMoves :: Int -> Int -> Player -> [(Pos, Player)]
 crossMoves width height player =
   [ ((width `div` 2 - 1, height `div` 2 - 1), player)
@@ -180,22 +183,13 @@ gameNew gameSettings =
 
 gameInitBots :: Game -> IO ()
 gameInitBots game =
-  evalContT $ callCC $ \exit -> do
-    busy <- lift $ readIORef $ gBusy game
-    when busy $ exit ()
-    lift $ writeIORef (gBusy game) True
+  evalContT $ unlessWithBusy (gBusy game) $ do
     initBots game
     gamePlayLoop game
-    lift $ writeIORef (gBusy game) False
 
 gamePlay :: Game -> IO ()
 gamePlay game =
-  evalContT $ callCC $ \exit -> do
-    busy <- lift $ readIORef $ gBusy game
-    when busy $ exit ()
-    lift $ writeIORef (gBusy game) True
-    gamePlayLoop game
-    lift $ writeIORef (gBusy game) False
+  evalContT $ unlessWithBusy (gBusy game) $ gamePlayLoop game
 
 gamePutPoint :: Game -> Pos -> IO ()
 gamePutPoint game pos =

@@ -169,7 +169,10 @@ main = do
   logo <- Gtk.pixbufNewFromFile "Logo.png"
   license <- readFile "LICENSE.txt"
   mainWindow <- mainWindowNew logo
-  let callbackError = const $ return ()
+  let callbackError player = Gtk.postGUIAsync $ do
+        messageDialog <- Gtk.messageDialogNew (Just $ mwWindow mainWindow) [] Gtk.MessageError Gtk.ButtonsOk $ show player ++ " bot made a mistake. It was killed."
+        _ <- Gtk.dialogRun messageDialog
+        Gtk.widgetDestroy messageDialog
       callback = Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ mwDrawingArea mainWindow
   game <- gameNew (cliGameSettings cliArguments) callbackError callback
   gameInitBots game

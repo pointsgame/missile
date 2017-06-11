@@ -122,27 +122,33 @@ genMove bot player =
   do let strPlayer = botPlayer player
      botQuestion bot $ "gen_move " ++ strPlayer
      ("gen_move" : answerX : answerY : [answerPlayer]) <- botAnswer bot
-     if answerPlayer /= strPlayer
+     let intX = read answerX
+         intY = read answerY
+     if answerPlayer /= strPlayer || intX < 0 || intY < 0
        then error "genMove: invalid answer."
-       else return (read answerX, read answerY)
+       else return (intX, intY)
 
 genMoveWithComplexity :: Bot -> Player -> Int -> IO Pos
 genMoveWithComplexity bot player complexity =
   do let strPlayer = botPlayer player
      botQuestion bot $ "gen_move_with_complexity " ++ strPlayer ++ " " ++ show complexity
      ("gen_move_with_complexity" : answerX : answerY : [answerPlayer]) <- botAnswer bot
-     if answerPlayer /= strPlayer
+     let intX = read answerX
+         intY = read answerY
+     if answerPlayer /= strPlayer || intX < 0 || intY < 0
        then error "genMoveWithComplexity: invalid answer."
-       else return (read answerX, read answerY)
+       else return (intX, intY)
 
 genMoveWithTime :: Bot -> Player -> Int -> IO Pos
 genMoveWithTime bot player time =
   do let strPlayer = botPlayer player
      botQuestion bot $ "gen_move_with_time " ++ strPlayer ++ " " ++ show time
      ("gen_move_with_time" : answerX : answerY : [answerPlayer]) <- botAnswer bot
-     if answerPlayer /= strPlayer
+     let intX = read answerX
+         intY = read answerY
+     if answerPlayer /= strPlayer || intX < 0 || intY < 0
        then error "genMoveWithTime: invalid answer."
-       else return (read answerX, read answerY)
+       else return (intX, intY)
 
 undo :: Bot -> IO ()
 undo bot =

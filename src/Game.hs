@@ -71,7 +71,7 @@ botError game player = do
   let botIORef = gameBotIORef game player
   maybeBot <- readIORef botIORef
   case maybeBot of
-    Just _ -> do evalContT $ stopBot botIORef 100
+    Just _ -> do evalContT $ stopBot botIORef 100 >> lift (writeIORef (gBusy game) False)
                  gError game player
     Nothing -> return ()
 

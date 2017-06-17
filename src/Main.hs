@@ -164,7 +164,7 @@ runPreferencesDialog startSettings preferencesDialog f =
                                      f settings
                                      Gtk.widgetDestroy $ pdDialog preferencesDialog
        Gtk.ResponseCancel      -> Gtk.widgetDestroy $ pdDialog preferencesDialog
-       _                       -> error $ "preferencesDialog: unexpected response: " ++ show response
+       _                       -> error $ "runPreferencesDialog: unexpected response: " ++ show response
 
 mainWindowNew :: Gtk.Pixbuf -> IO MainWindow
 mainWindowNew logo = do

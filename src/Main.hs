@@ -1,5 +1,7 @@
 module Main (main) where
 
+import Data.Colour.RGBSpace as Colour
+import Data.Colour.SRGB as SRGB
 import Data.Monoid
 import Data.IORef
 import Control.Monad
@@ -23,6 +25,146 @@ data MainWindow = MainWindow { mwWindow :: Gtk.Window
                              , mwDrawingArea :: Gtk.DrawingArea
                              , mwCoordLabel :: Gtk.Label
                              }
+
+data PreferencesDialog = PreferencesDialog { pdDialog :: Gtk.Dialog
+                                           , pdRedColorButton :: Gtk.ColorButton
+                                           , pdBlackColorButton :: Gtk.ColorButton
+                                           , pdBackgroundColorButton :: Gtk.ColorButton
+                                           , pdGridColorButton :: Gtk.ColorButton
+                                           , pdFillingAlphaSpinButton :: Gtk.SpinButton
+                                           , pdFullFillCheckButton :: Gtk.CheckButton
+                                           , pdGridThicknessSpinButton :: Gtk.SpinButton
+                                           , pdPointRadiusSpinButton :: Gtk.SpinButton
+                                           , pdHReflectionCheckButton :: Gtk.CheckButton
+                                           , pdVReflectionCheckButton :: Gtk.CheckButton
+                                           }
+
+rgbToGtkColor :: RGB Double -> Gtk.Color
+rgbToGtkColor (Colour.RGB r g b) =
+  let Colour.RGB r' g' b' = toSRGBBounded $ sRGB r g b
+  in Gtk.Color r' g' b'
+
+gtkColorToRgb :: Gtk.Color -> RGB Double
+gtkColorToRgb (Gtk.Color r g b) = toSRGB $ sRGBBounded r g b
+
+getSettings :: PreferencesDialog -> IO DrawSettings
+getSettings preferencesDialog =
+  do curRedColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdRedColorButton preferencesDialog
+     curBlackColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBlackColorButton preferencesDialog
+     curBackgroundColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBackgroundColorButton preferencesDialog
+     curGridColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdGridColorButton preferencesDialog
+     curFillingAlpha <- Gtk.get (pdFillingAlphaSpinButton preferencesDialog) Gtk.spinButtonValue
+     curFullFill <- Gtk.toggleButtonGetActive $ pdFullFillCheckButton preferencesDialog
+     curGridThickness <- fmap round $ Gtk.get (pdGridThicknessSpinButton preferencesDialog) Gtk.spinButtonValue
+     curPointRadius <- Gtk.get (pdPointRadiusSpinButton preferencesDialog) Gtk.spinButtonValue
+     curHorizontalReflection <- Gtk.toggleButtonGetActive $ pdHReflectionCheckButton preferencesDialog
+     curVerticalReflection <- Gtk.toggleButtonGetActive $ pdVReflectionCheckButton preferencesDialog
+     return DrawSettings { dsHReflection = curHorizontalReflection
+                         , dsVReflection = curVerticalReflection
+                         , dsGridThickness = curGridThickness
+                         , dsGridColor = curGridColor
+                         , dsBackgroundColor = curBackgroundColor
+                         , dsRedColor = curRedColor
+                         , dsBlackColor = curBlackColor
+                         , dsPointRadius = curPointRadius
+                         , dsFillingAlpha = curFillingAlpha
+                         , dsFullFill = curFullFill
+                         }
+
+preferencesDialogNew :: MainWindow -> DrawSettings -> IO PreferencesDialog
+preferencesDialogNew mainWindow startSettings =
+  do -- Create widgets.
+     preferencesDialog <- Gtk.dialogNew
+     preferencesDialogContent <- liftM Gtk.castToContainer $ Gtk.dialogGetContentArea preferencesDialog
+     applyButton <- Gtk.buttonNewFromStock Gtk.stockApply
+     okButton <- Gtk.buttonNewFromStock Gtk.stockOk
+     cancelButton <- Gtk.buttonNewFromStock Gtk.stockCancel
+     frame <- Gtk.frameNew
+     table <- Gtk.tableNew 5 4 False
+     redColorLabel <- Gtk.labelNew $ Just "Red's color"
+     redColorButton <- Gtk.colorButtonNew
+     blackColorLabel <- Gtk.labelNew $ Just "Black's color"
+     blackColorButton <- Gtk.colorButtonNew
+     backgroundColorLabel <- Gtk.labelNew $ Just "Background color"
+     backgroundColorButton <- Gtk.colorButtonNew
+     gridColorLabel <- Gtk.labelNew $ Just "Grid color"
+     gridColorButton <- Gtk.colorButtonNew
+     fillingAlphaLabel <- Gtk.labelNew $ Just "Filling alpha"
+     fillingAlphaAdjustment <- Gtk.adjustmentNew (dsFillingAlpha startSettings) 0 1 0.01 0.01 0
+     fillingAlphaSpinButton <- Gtk.spinButtonNew fillingAlphaAdjustment 0 2
+     fullFillCheckButton <- Gtk.checkButtonNewWithLabel "Full fill"
+     gridThicknessLabel <- Gtk.labelNew $ Just "Grid thickness"
+     gridThicknessAdjustment <- Gtk.adjustmentNew (fromIntegral $ dsGridThickness startSettings) 1 5 1 1 0
+     gridThicknessSpinButton <- Gtk.spinButtonNew gridThicknessAdjustment 0 0
+     pointRadiusLabel <- Gtk.labelNew $ Just "Point radius"
+     pointRadiusAdjustment <- Gtk.adjustmentNew (dsPointRadius startSettings) 0.1 10 0.1 0.1 0
+     pointRadiusSpinButton <- Gtk.spinButtonNew pointRadiusAdjustment 0 1
+     hReflectionCheckButton <- Gtk.checkButtonNewWithLabel "Horizontal reflection"
+     vReflectionCheckButton <- Gtk.checkButtonNewWithLabel "Vertical reflection"
+     -- Set properties.
+     preferencesDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow
+                                 , Gtk.windowModal := True
+                                 , Gtk.windowTitle := "Draw settings"
+                                 ]
+     Gtk.frameSetLabel frame "Draw settings"
+     Gtk.colorButtonSetColor redColorButton $ rgbToGtkColor $ dsRedColor startSettings
+     Gtk.colorButtonSetColor blackColorButton $ rgbToGtkColor $ dsBlackColor startSettings
+     Gtk.colorButtonSetColor backgroundColorButton $ rgbToGtkColor $ dsBackgroundColor startSettings
+     Gtk.colorButtonSetColor gridColorButton $ rgbToGtkColor $ dsGridColor startSettings
+     Gtk.toggleButtonSetActive fullFillCheckButton $ dsFullFill startSettings
+     Gtk.toggleButtonSetActive hReflectionCheckButton $ dsHReflection startSettings
+     Gtk.toggleButtonSetActive vReflectionCheckButton $ dsVReflection startSettings
+     -- Set hierarchy.
+     Gtk.dialogAddActionWidget preferencesDialog applyButton Gtk.ResponseApply
+     Gtk.dialogAddActionWidget preferencesDialog okButton Gtk.ResponseOk
+     Gtk.dialogAddActionWidget preferencesDialog cancelButton Gtk.ResponseCancel
+     Gtk.containerAdd preferencesDialogContent frame
+     Gtk.containerAdd frame table
+     Gtk.tableAttachDefaults table redColorLabel 0 1 0 1
+     Gtk.tableAttachDefaults table redColorButton 1 2 0 1
+     Gtk.tableAttachDefaults table blackColorLabel 2 3 0 1
+     Gtk.tableAttachDefaults table blackColorButton 3 4 0 1
+     Gtk.tableAttachDefaults table backgroundColorLabel 0 1 1 2
+     Gtk.tableAttachDefaults table backgroundColorButton 1 2 1 2
+     Gtk.tableAttachDefaults table gridColorLabel 2 3 1 2
+     Gtk.tableAttachDefaults table gridColorButton 3 4 1 2
+     Gtk.tableAttachDefaults table fillingAlphaLabel 0 1 2 3
+     Gtk.tableAttachDefaults table fillingAlphaSpinButton 1 2 2 3
+     Gtk.tableAttachDefaults table fullFillCheckButton 2 4 2 3
+     Gtk.tableAttachDefaults table gridThicknessLabel 0 1 3 4
+     Gtk.tableAttachDefaults table gridThicknessSpinButton 1 2 3 4
+     Gtk.tableAttachDefaults table pointRadiusLabel 2 3 3 4
+     Gtk.tableAttachDefaults table pointRadiusSpinButton 3 4 3 4
+     Gtk.tableAttachDefaults table hReflectionCheckButton 0 2 4 5
+     Gtk.tableAttachDefaults table vReflectionCheckButton 2 4 4 5
+     -- Return dialog.
+     return PreferencesDialog { pdDialog = preferencesDialog
+                              , pdRedColorButton = redColorButton
+                              , pdBlackColorButton = blackColorButton
+                              , pdBackgroundColorButton = backgroundColorButton
+                              , pdGridColorButton = gridColorButton
+                              , pdFillingAlphaSpinButton = fillingAlphaSpinButton
+                              , pdFullFillCheckButton = fullFillCheckButton
+                              , pdGridThicknessSpinButton = gridThicknessSpinButton
+                              , pdPointRadiusSpinButton = pointRadiusSpinButton
+                              , pdHReflectionCheckButton = hReflectionCheckButton
+                              , pdVReflectionCheckButton = vReflectionCheckButton
+                              }
+
+runPreferencesDialog :: DrawSettings -> PreferencesDialog -> (DrawSettings -> IO ()) -> IO ()
+runPreferencesDialog startSettings preferencesDialog f =
+  do Gtk.widgetShowAll $ pdDialog preferencesDialog
+     response <- Gtk.dialogRun $ pdDialog preferencesDialog
+     case response of
+       Gtk.ResponseDeleteEvent -> Gtk.widgetDestroy $ pdDialog preferencesDialog
+       Gtk.ResponseApply       -> do settings <- getSettings preferencesDialog
+                                     f settings
+                                     runPreferencesDialog startSettings preferencesDialog f
+       Gtk.ResponseOk          -> do settings <- getSettings preferencesDialog
+                                     f settings
+                                     Gtk.widgetDestroy $ pdDialog preferencesDialog
+       Gtk.ResponseCancel      -> Gtk.widgetDestroy $ pdDialog preferencesDialog
+       _                       -> error $ "preferencesDialog: unexpected response: " ++ show response
 
 mainWindowNew :: Gtk.Pixbuf -> IO MainWindow
 mainWindowNew logo = do
@@ -131,6 +273,12 @@ listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
                           ]
     _ <- Gtk.dialogRun aboutDialog
     Gtk.widgetDestroy aboutDialog
+  _ <- mwPreferencesImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $ do
+    drawSettings <- readIORef drawSettingsIORef
+    preferencesDialog <- preferencesDialogNew mainWindow drawSettings
+    runPreferencesDialog drawSettings preferencesDialog $ \newSettings -> do
+      writeIORef drawSettingsIORef newSettings
+      Gtk.widgetQueueDraw $ mwDrawingArea mainWindow
   _ <- mwDrawingArea mainWindow `Gtk.on` Gtk.draw $ do
     drawSettings <- liftIO $ readIORef drawSettingsIORef
     game <- liftIO $ readIORef gameIORef

@@ -15,38 +15,38 @@ First of all you will need cabal with ghc installed on your system.
 Then update list of packages:
 
 ```sh
-    cabal update
+cabal update
 ```
 
 If your distro doesn't have the latest cabal you can update it with:
 
 ```sh
-    cabal install cabal-install
-    export PATH=~/.cabal/bin:$PATH
+cabal install cabal-install
+export PATH=~/.cabal/bin:$PATH
 ```
 
 Then init cabal sandbox in the directory with cloned repo:
 
 ```sh
-    cabal sandbox init
+cabal sandbox init
 ```
 
 Install dependencies:
 
 ```sh
-    cabal install --dependencies-only --enable-optimisation=2
+cabal install --dependencies-only --enable-optimisation=2
 ```
 
 Compile with:
 
 ```sh
-    cabal build
+cabal build
 ```
 
-Run with
+Run with:
 
 ```sh
-    ./dist/build/missile/missile
+./dist/build/missile/missile
 ```
 
 License

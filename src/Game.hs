@@ -12,6 +12,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.Trans.Cont
 import Control.Monad.Trans.Class
+import System.Random
 import Player
 import Field
 import GameTree
@@ -113,7 +114,8 @@ playBotMoves bot moves' callbackError =
 initBot :: GameTree -> String -> IO () -> ContT () IO Bot
 initBot gameTree path callbackError = do --todo callcc and continue in case of failure, kill failed bot
   bot <- contRun path callbackError
-  contInit bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) 0 callbackError
+  seed <- lift randomIO
+  contInit bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) seed callbackError
   playBotMoves bot (moves $ head $ gtFields gameTree) callbackError
   return bot
 

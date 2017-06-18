@@ -30,7 +30,7 @@ executable missile
                       process,
                       --bytestring,
                       colour,
-                      --random,
+                      random,
                       gtk3,
                       cairo,
                       optparse-applicative

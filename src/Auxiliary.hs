@@ -1,4 +1,17 @@
-module Auxiliary where
+module Auxiliary ( trim
+                 , removeNearSame
+                 , count
+                 , leftShift1
+                 , padRight
+                 , toTreeInv
+                 , fst'
+                 , snd'
+                 , thd'
+                 , fst''
+                 , snd''
+                 , thd''
+                 , fth''
+                 ) where
 
 import Data.Tree
 import Data.Char (isSpace)

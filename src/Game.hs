@@ -100,7 +100,7 @@ gamePlayLoop game =
           gameSettings <- lift $ readIORef $ gGameSettings game
           genMoveByType (gsGenMoveType gameSettings) bot player $ botError game player
         Nothing -> exit2 ()
-      unless (isGameTreePuttingAllowed gameTree pos) $ (lift $ botError game player) >> exit1 ()
+      unless (isGameTreePuttingAllowed gameTree pos) $ lift (botError game player) >> exit1 ()
       let newGameTree = putGameTreePlayersPoint pos player gameTree
       lift $ writeIORef (gGameTree game) newGameTree
       lift $ gCallback game
@@ -123,7 +123,7 @@ stopBot :: IORef (Maybe Bot) -> Int -> ContT () IO ()
 stopBot botIORef delay = do
   maybeBot <- lift $ readIORef botIORef
   lift $ writeIORef botIORef Nothing
-  forM_ maybeBot (flip contStop delay)
+  forM_ maybeBot (`contStop` delay)
 
 stopBots :: Game -> Int -> ContT () IO ()
 stopBots game delay = do
@@ -227,4 +227,4 @@ gameStopBots :: Game -> Int -> IO () -> IO ()
 gameStopBots game delay callback =
   evalContT $ do
     withBusy (gBusy game) $ stopBots game delay
-    lift $ callback
+    lift callback

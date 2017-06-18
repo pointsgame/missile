@@ -45,7 +45,7 @@ botQuestion bot question =
 
 botAnswer :: Bot -> IO [String]
 botAnswer bot =
-  do ("=" : "0" : answer) <- liftM splitAnswer $ hGetLine $ stdOutput bot
+  do ("=" : "0" : answer) <- fmap splitAnswer $ hGetLine $ stdOutput bot
      return answer
 
 botPlayer :: Player -> String

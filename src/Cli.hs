@@ -1,4 +1,6 @@
-module Cli where
+module Cli ( cliArgumentsParser
+           , CliArguments(..)
+           ) where
 
 import Data.Default
 import Data.Monoid

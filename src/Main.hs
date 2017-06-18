@@ -55,7 +55,7 @@ getSettings preferencesDialog =
      curGridColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdGridColorButton preferencesDialog
      curFillingAlpha <- Gtk.get (pdFillingAlphaSpinButton preferencesDialog) Gtk.spinButtonValue
      curFullFill <- Gtk.toggleButtonGetActive $ pdFullFillCheckButton preferencesDialog
-     curGridThickness <- fmap round $ Gtk.get (pdGridThicknessSpinButton preferencesDialog) Gtk.spinButtonValue
+     curGridThickness <- round <$> Gtk.get (pdGridThicknessSpinButton preferencesDialog) Gtk.spinButtonValue
      curPointRadius <- Gtk.get (pdPointRadiusSpinButton preferencesDialog) Gtk.spinButtonValue
      curHorizontalReflection <- Gtk.toggleButtonGetActive $ pdHReflectionCheckButton preferencesDialog
      curVerticalReflection <- Gtk.toggleButtonGetActive $ pdVReflectionCheckButton preferencesDialog
@@ -291,14 +291,14 @@ listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
     liftIO $ do
       drawSettings <- readIORef drawSettingsIORef
       game <- readIORef gameIORef
-      field <- fmap head $ gameFields game
+      field <- head <$> gameFields game
       updateCoordLabel (mwCoordLabel mainWindow) (mwDrawingArea mainWindow) field drawSettings x y
     return False
   _ <- mwCoordLabel mainWindow `Gtk.on` Gtk.draw $ liftIO $ do
     (x, y) <- Gtk.widgetGetPointer $ mwDrawingArea mainWindow
     drawSettings <- readIORef drawSettingsIORef
     game <- readIORef gameIORef
-    field <- fmap head $ gameFields game
+    field <- head <$> gameFields game
     updateCoordLabel (mwCoordLabel mainWindow) (mwDrawingArea mainWindow) field drawSettings (fromIntegral x) (fromIntegral y)
   _ <- mwDrawingArea mainWindow `Gtk.on` Gtk.buttonPressEvent $ Gtk.tryEvent $ do
     Gtk.LeftButton <- Gtk.eventButton
@@ -306,7 +306,7 @@ listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
     liftIO $ do
       drawSettings <- readIORef drawSettingsIORef
       game <- readIORef gameIORef
-      field <- fmap head $ gameFields game
+      field <- head <$> gameFields game
       withPos (mwDrawingArea mainWindow) field drawSettings x y $ \pos -> gamePutPoint game pos
   return ()
 

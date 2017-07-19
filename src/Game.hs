@@ -115,7 +115,7 @@ initBot :: GameTree -> String -> IO () -> ContT () IO Bot
 initBot gameTree path callbackError = do --todo callcc and continue in case of failure, kill failed bot
   bot <- contRun path callbackError
   seed <- lift randomIO
-  contInit bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) seed callbackError
+  contInit bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) (abs seed) callbackError
   playBotMoves bot (moves $ head $ gtFields gameTree) callbackError
   return bot
 

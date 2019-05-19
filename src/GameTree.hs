@@ -65,8 +65,8 @@ updateGameTree [] tree = tree
 updateGameTree (h : t) (Node field children) =
   let move = head (moves h)
   in case findByLastMove move children of
-       Just child -> Node field $ (updateGameTree t child) : filterByLastMove move children
-       Nothing -> Node field $ (updateGameTree t (Node h [])) : children
+       Just child -> Node field $ updateGameTree t child : filterByLastMove move children
+       Nothing -> Node field $ updateGameTree t (Node h []) : children
 
 putGameTreePlayersPoint :: Pos -> Player -> GameTree -> GameTree
 putGameTreePlayersPoint pos player gameTree =

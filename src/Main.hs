@@ -2,7 +2,6 @@ module Main (main) where
 
 import Data.Colour.RGBSpace as Colour
 import Data.Colour.SRGB as SRGB
-import Data.Monoid
 import Data.IORef
 import Control.Monad
 import Control.Monad.IO.Class
@@ -49,10 +48,10 @@ gtkColorToRgb (Gtk.Color r g b) = toSRGB $ sRGBBounded r g b
 
 getSettings :: PreferencesDialog -> IO DrawSettings
 getSettings preferencesDialog =
-  do curRedColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdRedColorButton preferencesDialog
-     curBlackColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBlackColorButton preferencesDialog
-     curBackgroundColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBackgroundColorButton preferencesDialog
-     curGridColor <- liftM gtkColorToRgb $ Gtk.colorButtonGetColor $ pdGridColorButton preferencesDialog
+  do curRedColor <- fmap gtkColorToRgb $ Gtk.colorButtonGetColor $ pdRedColorButton preferencesDialog
+     curBlackColor <- fmap gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBlackColorButton preferencesDialog
+     curBackgroundColor <- fmap gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBackgroundColorButton preferencesDialog
+     curGridColor <- fmap gtkColorToRgb $ Gtk.colorButtonGetColor $ pdGridColorButton preferencesDialog
      curFillingAlpha <- Gtk.get (pdFillingAlphaSpinButton preferencesDialog) Gtk.spinButtonValue
      curFullFill <- Gtk.toggleButtonGetActive $ pdFullFillCheckButton preferencesDialog
      curGridThickness <- round <$> Gtk.get (pdGridThicknessSpinButton preferencesDialog) Gtk.spinButtonValue
@@ -75,7 +74,7 @@ preferencesDialogNew :: MainWindow -> DrawSettings -> IO PreferencesDialog
 preferencesDialogNew mainWindow startSettings =
   do -- Create widgets.
      preferencesDialog <- Gtk.dialogNew
-     preferencesDialogContent <- liftM Gtk.castToContainer $ Gtk.dialogGetContentArea preferencesDialog
+     preferencesDialogContent <- Gtk.castToContainer <$> Gtk.dialogGetContentArea preferencesDialog
      applyButton <- Gtk.buttonNewFromStock Gtk.stockApply
      okButton <- Gtk.buttonNewFromStock Gtk.stockOk
      cancelButton <- Gtk.buttonNewFromStock Gtk.stockCancel

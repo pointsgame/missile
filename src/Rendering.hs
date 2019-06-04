@@ -7,7 +7,7 @@ import Data.Default
 import Data.Maybe
 import Control.Monad
 import Data.Colour.RGBSpace as Colour
-import qualified Graphics.Rendering.Cairo as Cairo
+import qualified GI.Cairo.Render as Cairo
 import Player
 import Field
 

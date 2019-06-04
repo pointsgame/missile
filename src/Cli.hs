@@ -3,7 +3,6 @@ module Cli ( cliArgumentsParser
            ) where
 
 import Data.Default
-import Data.Monoid
 import Options.Applicative
 import Data.Colour.RGBSpace as RGBSpace
 import Data.Colour.Names as ColourNames
@@ -96,7 +95,7 @@ gameSettingsParser =
   redBotPathParser <*>
   blackBotPathParser
 
-data CliArguments = CliArguments { cliDawSettings :: DrawSettings
+data CliArguments = CliArguments { cliDrawSettings :: DrawSettings
                                  , cliGameSettings :: GameSettings
                                  }
 

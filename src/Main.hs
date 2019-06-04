@@ -1,13 +1,37 @@
+{-# LANGUAGE OverloadedStrings, OverloadedLabels #-}
+
 module Main (main) where
 
 import Data.Colour.RGBSpace as Colour
-import Data.Colour.SRGB as SRGB
 import Data.IORef
+import Data.Text ( Text
+                 , pack
+                 )
+import Data.Text.IO as TextIO ( readFile
+                              )
 import Control.Monad
-import Control.Monad.IO.Class
 import Options.Applicative
-import qualified Graphics.UI.Gtk as Gtk
-import Graphics.UI.Gtk (AttrOp((:=)))
+import qualified GI.Gtk as Gtk
+import Data.GI.Base ( get
+                    , new
+                    , on
+                    , set
+                    , AttrOp((:=))
+                    )
+import Data.GI.Gtk.Threading ( postGUIASync
+                             )
+import GI.Cairo.Render.Connector ( renderWithContext
+                                 )
+import GI.Gdk.Flags ( EventMask ( EventMaskButtonPressMask
+                                , EventMaskPointerMotionMask
+                                )
+                    )
+import GI.Gdk.Structs ( RGBA
+                      , newZeroRGBA
+                      )
+import GI.GdkPixbuf.Objects.Pixbuf ( Pixbuf
+                                   , pixbufNewFromFile
+                                   )
 import Field
 import Game
 import Rendering
@@ -17,7 +41,7 @@ data MainWindow = MainWindow { mwWindow :: Gtk.Window
                              , mwNewImageMenuItem :: Gtk.ImageMenuItem
                              , mwOpenImageMenuItem :: Gtk.ImageMenuItem
                              , mwSaveImageMenuItem :: Gtk.ImageMenuItem
-                             , mwQuitImageMenuItem :: Gtk.ImageMenuItem
+                             , mwExitImageMenuItem :: Gtk.ImageMenuItem
                              , mwUndoImageMenuItem :: Gtk.ImageMenuItem
                              , mwPreferencesImageMenuItem :: Gtk.ImageMenuItem
                              , mwAboutImageMenuItem :: Gtk.ImageMenuItem
@@ -38,26 +62,35 @@ data PreferencesDialog = PreferencesDialog { pdDialog :: Gtk.Dialog
                                            , pdVReflectionCheckButton :: Gtk.CheckButton
                                            }
 
-rgbToGtkColor :: RGB Double -> Gtk.Color
-rgbToGtkColor (Colour.RGB r g b) =
-  let Colour.RGB r' g' b' = toSRGBBounded $ sRGB r g b
-  in Gtk.Color r' g' b'
+rgbToGtkRgba :: RGB Double -> IO RGBA
+rgbToGtkRgba (RGB r g b) =
+  do rgba <- newZeroRGBA
+     rgba `set` [ #red := r
+                , #green := g
+                , #blue := b
+                , #alpha := 1
+                ]
+     return rgba
 
-gtkColorToRgb :: Gtk.Color -> RGB Double
-gtkColorToRgb (Gtk.Color r g b) = toSRGB $ sRGBBounded r g b
+gtkRgbaToRgb :: RGBA -> IO (RGB Double)
+gtkRgbaToRgb rgba =
+  do r <- rgba `get` #red
+     g <- rgba `get` #green
+     b <- rgba `get` #blue
+     return $ RGB r g b
 
-getSettings :: PreferencesDialog -> IO DrawSettings
-getSettings preferencesDialog =
-  do curRedColor <- fmap gtkColorToRgb $ Gtk.colorButtonGetColor $ pdRedColorButton preferencesDialog
-     curBlackColor <- fmap gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBlackColorButton preferencesDialog
-     curBackgroundColor <- fmap gtkColorToRgb $ Gtk.colorButtonGetColor $ pdBackgroundColorButton preferencesDialog
-     curGridColor <- fmap gtkColorToRgb $ Gtk.colorButtonGetColor $ pdGridColorButton preferencesDialog
-     curFillingAlpha <- Gtk.get (pdFillingAlphaSpinButton preferencesDialog) Gtk.spinButtonValue
-     curFullFill <- Gtk.toggleButtonGetActive $ pdFullFillCheckButton preferencesDialog
-     curGridThickness <- round <$> Gtk.get (pdGridThicknessSpinButton preferencesDialog) Gtk.spinButtonValue
-     curPointRadius <- Gtk.get (pdPointRadiusSpinButton preferencesDialog) Gtk.spinButtonValue
-     curHorizontalReflection <- Gtk.toggleButtonGetActive $ pdHReflectionCheckButton preferencesDialog
-     curVerticalReflection <- Gtk.toggleButtonGetActive $ pdVReflectionCheckButton preferencesDialog
+getSettings :: DrawSettings -> PreferencesDialog -> IO DrawSettings
+getSettings startSettings preferencesDialog =
+  do curRedColor <- pdRedColorButton preferencesDialog `get` #rgba >>= maybe (return $ dsRedColor startSettings) gtkRgbaToRgb
+     curBlackColor <- pdBlackColorButton preferencesDialog `get` #rgba >>= maybe (return $ dsBlackColor startSettings) gtkRgbaToRgb
+     curBackgroundColor <- pdBackgroundColorButton preferencesDialog `get` #rgba >>= maybe (return $ dsBackgroundColor startSettings) gtkRgbaToRgb
+     curGridColor <- pdGridColorButton preferencesDialog `get` #rgba >>= maybe (return $ dsGridColor startSettings) gtkRgbaToRgb
+     curFillingAlpha <- pdFillingAlphaSpinButton preferencesDialog `get` #value
+     curFullFill <- pdFullFillCheckButton preferencesDialog `get` #active
+     curGridThickness <- round <$> pdGridThicknessSpinButton preferencesDialog `get` #value
+     curPointRadius <- pdPointRadiusSpinButton preferencesDialog `get` #value
+     curHorizontalReflection <- pdHReflectionCheckButton preferencesDialog `get` #active
+     curVerticalReflection <- pdVReflectionCheckButton preferencesDialog `get` #active
      return DrawSettings { dsHReflection = curHorizontalReflection
                          , dsVReflection = curVerticalReflection
                          , dsGridThickness = curGridThickness
@@ -72,71 +105,104 @@ getSettings preferencesDialog =
 
 preferencesDialogNew :: MainWindow -> DrawSettings -> IO PreferencesDialog
 preferencesDialogNew mainWindow startSettings =
-  do -- Create widgets.
-     preferencesDialog <- Gtk.dialogNew
-     preferencesDialogContent <- Gtk.castToContainer <$> Gtk.dialogGetContentArea preferencesDialog
-     applyButton <- Gtk.buttonNewFromStock Gtk.stockApply
-     okButton <- Gtk.buttonNewFromStock Gtk.stockOk
-     cancelButton <- Gtk.buttonNewFromStock Gtk.stockCancel
-     frame <- Gtk.frameNew
-     table <- Gtk.tableNew 5 4 False
-     redColorLabel <- Gtk.labelNew $ Just "Red's color"
-     redColorButton <- Gtk.colorButtonNew
-     blackColorLabel <- Gtk.labelNew $ Just "Black's color"
-     blackColorButton <- Gtk.colorButtonNew
-     backgroundColorLabel <- Gtk.labelNew $ Just "Background color"
-     backgroundColorButton <- Gtk.colorButtonNew
-     gridColorLabel <- Gtk.labelNew $ Just "Grid color"
-     gridColorButton <- Gtk.colorButtonNew
-     fillingAlphaLabel <- Gtk.labelNew $ Just "Filling alpha"
-     fillingAlphaAdjustment <- Gtk.adjustmentNew (dsFillingAlpha startSettings) 0 1 0.01 0.01 0
-     fillingAlphaSpinButton <- Gtk.spinButtonNew fillingAlphaAdjustment 0 2
-     fullFillCheckButton <- Gtk.checkButtonNewWithLabel "Full fill"
-     gridThicknessLabel <- Gtk.labelNew $ Just "Grid thickness"
-     gridThicknessAdjustment <- Gtk.adjustmentNew (fromIntegral $ dsGridThickness startSettings) 1 5 1 1 0
-     gridThicknessSpinButton <- Gtk.spinButtonNew gridThicknessAdjustment 0 0
-     pointRadiusLabel <- Gtk.labelNew $ Just "Point radius"
-     pointRadiusAdjustment <- Gtk.adjustmentNew (dsPointRadius startSettings) 0.1 10 0.1 0.1 0
-     pointRadiusSpinButton <- Gtk.spinButtonNew pointRadiusAdjustment 0 1
-     hReflectionCheckButton <- Gtk.checkButtonNewWithLabel "Horizontal reflection"
-     vReflectionCheckButton <- Gtk.checkButtonNewWithLabel "Vertical reflection"
-     -- Set properties.
-     preferencesDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow
-                                 , Gtk.windowModal := True
-                                 , Gtk.windowTitle := "Draw settings"
-                                 ]
-     Gtk.frameSetLabel frame "Draw settings"
-     Gtk.colorButtonSetColor redColorButton $ rgbToGtkColor $ dsRedColor startSettings
-     Gtk.colorButtonSetColor blackColorButton $ rgbToGtkColor $ dsBlackColor startSettings
-     Gtk.colorButtonSetColor backgroundColorButton $ rgbToGtkColor $ dsBackgroundColor startSettings
-     Gtk.colorButtonSetColor gridColorButton $ rgbToGtkColor $ dsGridColor startSettings
-     Gtk.toggleButtonSetActive fullFillCheckButton $ dsFullFill startSettings
-     Gtk.toggleButtonSetActive hReflectionCheckButton $ dsHReflection startSettings
-     Gtk.toggleButtonSetActive vReflectionCheckButton $ dsVReflection startSettings
-     -- Set hierarchy.
-     Gtk.dialogAddActionWidget preferencesDialog applyButton Gtk.ResponseApply
-     Gtk.dialogAddActionWidget preferencesDialog okButton Gtk.ResponseOk
-     Gtk.dialogAddActionWidget preferencesDialog cancelButton Gtk.ResponseCancel
-     Gtk.containerAdd preferencesDialogContent frame
-     Gtk.containerAdd frame table
-     Gtk.tableAttachDefaults table redColorLabel 0 1 0 1
-     Gtk.tableAttachDefaults table redColorButton 1 2 0 1
-     Gtk.tableAttachDefaults table blackColorLabel 2 3 0 1
-     Gtk.tableAttachDefaults table blackColorButton 3 4 0 1
-     Gtk.tableAttachDefaults table backgroundColorLabel 0 1 1 2
-     Gtk.tableAttachDefaults table backgroundColorButton 1 2 1 2
-     Gtk.tableAttachDefaults table gridColorLabel 2 3 1 2
-     Gtk.tableAttachDefaults table gridColorButton 3 4 1 2
-     Gtk.tableAttachDefaults table fillingAlphaLabel 0 1 2 3
-     Gtk.tableAttachDefaults table fillingAlphaSpinButton 1 2 2 3
-     Gtk.tableAttachDefaults table fullFillCheckButton 2 4 2 3
-     Gtk.tableAttachDefaults table gridThicknessLabel 0 1 3 4
-     Gtk.tableAttachDefaults table gridThicknessSpinButton 1 2 3 4
-     Gtk.tableAttachDefaults table pointRadiusLabel 2 3 3 4
-     Gtk.tableAttachDefaults table pointRadiusSpinButton 3 4 3 4
-     Gtk.tableAttachDefaults table hReflectionCheckButton 0 2 4 5
-     Gtk.tableAttachDefaults table vReflectionCheckButton 2 4 4 5
-     -- Return dialog.
+  do
+     applyButton <- new Gtk.Button [ #label := "_Apply"
+                                   , #useUnderline := True
+                                   ]
+     okButton <- new Gtk.Button [ #label := "_Ok"
+                                , #useUnderline := True
+                                ]
+     cancelButton <- new Gtk.Button [ #label := "_Cancel"
+                                    , #useUnderline := True
+                                    ]
+     redColorLabel <- new Gtk.Label [ #label := "Red's color"
+                                    ]
+     redColor <- rgbToGtkRgba $ dsRedColor startSettings
+     redColorButton <- new Gtk.ColorButton [ #rgba := redColor
+                                           ]
+     blackColorLabel <- new Gtk.Label [ #label := "Black's color"
+                                      ]
+     blackColor <- rgbToGtkRgba $ dsBlackColor startSettings
+     blackColorButton <- new Gtk.ColorButton [ #rgba := blackColor
+                                             ]
+     backgroundColorLabel <- new Gtk.Label [ #label := "Background color"
+                                           ]
+     backgroundColor <- rgbToGtkRgba $ dsBackgroundColor startSettings
+     backgroundColorButton <- new Gtk.ColorButton [ #rgba := backgroundColor
+                                                  ]
+     gridColorLabel <- new Gtk.Label [ #label := "Grid color"
+                                     ]
+     gridColor <- rgbToGtkRgba $ dsGridColor startSettings
+     gridColorButton <- new Gtk.ColorButton [ #rgba := gridColor
+                                            ]
+     fillingAlphaLabel <- new Gtk.Label [ #label := "Filling alpha"
+                                        ]
+     fillingAlphaAdjustment <- new Gtk.Adjustment [ #lower := 0
+                                                  , #stepIncrement := 0.01
+                                                  , #upper := 1
+                                                  , #value := dsFillingAlpha startSettings
+                                                  ]
+     fillingAlphaSpinButton <- new Gtk.SpinButton [ #adjustment := fillingAlphaAdjustment
+                                                  , #digits := 2
+                                                  ]
+     fullFillCheckButton <- new Gtk.CheckButton [ #active := dsFullFill startSettings
+                                                , #label := "Full fill"
+                                                ]
+     gridThicknessLabel <- new Gtk.Label [ #label := "Grid thickness"
+                                         ]
+     gridThicknessAdjustment <- new Gtk.Adjustment [ #lower := 1
+                                                   , #stepIncrement := 1
+                                                   , #upper := 5
+                                                   , #value := fromIntegral $ dsGridThickness startSettings
+                                                   ]
+     gridThicknessSpinButton <- new Gtk.SpinButton [ #adjustment := gridThicknessAdjustment
+                                                   ]
+     pointRadiusLabel <- new Gtk.Label [ #label := "Point radius"
+                                       ]
+     pointRadiusAdjustment <- new Gtk.Adjustment [ #lower := 0.1
+                                                 , #stepIncrement := 0.1
+                                                 , #upper := 10
+                                                 , #value := dsPointRadius startSettings
+                                                 ]
+     pointRadiusSpinButton <- new Gtk.SpinButton [ #adjustment := pointRadiusAdjustment
+                                                 , #digits := 1
+                                                 ]
+     hReflectionCheckButton <- new Gtk.CheckButton [ #active := dsHReflection startSettings
+                                                   , #label := "Horizontal reflection"
+                                                   ]
+     vReflectionCheckButton <- new Gtk.CheckButton [ #active := dsVReflection startSettings
+                                                   , #label := "Vertical reflection"
+                                                   ]
+     grid <- new Gtk.Grid []
+     #attach grid redColorLabel 0 0 1 1
+     #attach grid redColorButton 1 0 1 1
+     #attach grid blackColorLabel 2 0 1 1
+     #attach grid blackColorButton 3 0 1 1
+     #attach grid backgroundColorLabel 0 1 1 1
+     #attach grid backgroundColorButton 1 1 1 1
+     #attach grid gridColorLabel 2 1 1 1
+     #attach grid gridColorButton 3 1 1 1
+     #attach grid fillingAlphaLabel 0 2 1 1
+     #attach grid fillingAlphaSpinButton 1 2 1 1
+     #attach grid fullFillCheckButton 2 2 2 1
+     #attach grid gridThicknessLabel 0 3 1 1
+     #attach grid gridThicknessSpinButton 1 3 1 1
+     #attach grid pointRadiusLabel 2 3 1 1
+     #attach grid pointRadiusSpinButton 3 3 1 1
+     #attach grid hReflectionCheckButton 0 4 2 1
+     #attach grid vReflectionCheckButton 2 4 2 1
+     frame <- new Gtk.Frame [ #label := "Draw settings"
+                            ]
+     #add frame grid
+     preferencesDialog <- new Gtk.Dialog [ #modal := True
+                                         , #title := "Draw settings"
+                                         , #transientFor := mwWindow mainWindow
+                                         ]
+     #addActionWidget preferencesDialog applyButton $ (fromIntegral . fromEnum) Gtk.ResponseTypeApply
+     #addActionWidget preferencesDialog okButton $ (fromIntegral . fromEnum) Gtk.ResponseTypeOk
+     #addActionWidget preferencesDialog cancelButton $ (fromIntegral . fromEnum) Gtk.ResponseTypeCancel
+     preferencesDialogContent <- #getContentArea preferencesDialog
+     #add preferencesDialogContent frame
      return PreferencesDialog { pdDialog = preferencesDialog
                               , pdRedColorButton = redColorButton
                               , pdBlackColorButton = blackColorButton
@@ -152,77 +218,118 @@ preferencesDialogNew mainWindow startSettings =
 
 runPreferencesDialog :: DrawSettings -> PreferencesDialog -> (DrawSettings -> IO ()) -> IO ()
 runPreferencesDialog startSettings preferencesDialog f =
-  do Gtk.widgetShowAll $ pdDialog preferencesDialog
-     response <- Gtk.dialogRun $ pdDialog preferencesDialog
+  do #showAll $ pdDialog preferencesDialog
+     response <- fmap (toEnum . fromIntegral) $ #run $ pdDialog preferencesDialog
+     let apply = getSettings startSettings preferencesDialog >>= f
+         destroy = #destroy $ pdDialog preferencesDialog
+         continue = runPreferencesDialog startSettings preferencesDialog f
      case response of
-       Gtk.ResponseDeleteEvent -> Gtk.widgetDestroy $ pdDialog preferencesDialog
-       Gtk.ResponseApply       -> do settings <- getSettings preferencesDialog
-                                     f settings
-                                     runPreferencesDialog startSettings preferencesDialog f
-       Gtk.ResponseOk          -> do settings <- getSettings preferencesDialog
-                                     f settings
-                                     Gtk.widgetDestroy $ pdDialog preferencesDialog
-       Gtk.ResponseCancel      -> Gtk.widgetDestroy $ pdDialog preferencesDialog
-       _                       -> error $ "runPreferencesDialog: unexpected response: " ++ show response
+       Gtk.ResponseTypeCancel      -> destroy
+       Gtk.ResponseTypeDeleteEvent -> destroy
+       Gtk.ResponseTypeApply       -> apply >> continue
+       Gtk.ResponseTypeOk          -> apply >> destroy
+       _                           -> error $ "runPreferencesDialog: unexpected response: " ++ show response
 
-mainWindowNew :: Gtk.Pixbuf -> IO MainWindow
+mainWindowNew :: Pixbuf -> IO MainWindow
 mainWindowNew logo = do
-  -- Create widgets.
-  mainWindow <- Gtk.windowNew
-  vbox <- Gtk.vBoxNew False 1
-  menuBar <- Gtk.menuBarNew
-  fileImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockFile
-  fileMenu <- Gtk.menuNew
-  newImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockNew
-  openImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockOpen
-  saveImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockSave
-  fileSeparatorMenuItem <- Gtk.separatorMenuItemNew
-  quitImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockQuit
-  editImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockEdit
-  editMenu <- Gtk.menuNew
-  undoImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockUndo
-  editSeparatorMenuItem <- Gtk.separatorMenuItemNew
-  preferencesImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockPreferences
-  helpImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockHelp
-  helpMenu <- Gtk.menuNew
-  aboutImageMenuItem <- Gtk.imageMenuItemNewFromStock Gtk.stockAbout
-  table <- Gtk.tableNew 2 1 False
-  drawingArea <- Gtk.drawingAreaNew
-  coordLabel <- Gtk.labelNew (Nothing :: Maybe String)
-  -- Set properties.
-  Gtk.windowSetDefaultSize mainWindow 800 600
-  mainWindow `Gtk.set` [ Gtk.windowTitle := "Missile"
-                       , Gtk.windowIcon := Just logo
-                       , Gtk.containerChild := vbox
-                       ]
-  drawingArea `Gtk.widgetAddEvents` [Gtk.PointerMotionMask]
-  -- Set hierarchy.
-  Gtk.containerAdd vbox menuBar
-  vbox `Gtk.set` [Gtk.boxChildPacking menuBar := Gtk.PackNatural]
-  Gtk.containerAdd menuBar fileImageMenuItem
-  fileImageMenuItem `Gtk.set` [Gtk.menuItemSubmenu := fileMenu]
-  Gtk.containerAdd fileMenu newImageMenuItem
-  Gtk.containerAdd fileMenu openImageMenuItem
-  Gtk.containerAdd fileMenu saveImageMenuItem
-  Gtk.containerAdd fileMenu fileSeparatorMenuItem
-  Gtk.containerAdd fileMenu quitImageMenuItem
-  Gtk.containerAdd menuBar editImageMenuItem
-  editImageMenuItem `Gtk.set` [Gtk.menuItemSubmenu := editMenu]
-  Gtk.containerAdd editMenu undoImageMenuItem
-  Gtk.containerAdd editMenu editSeparatorMenuItem
-  Gtk.containerAdd editMenu preferencesImageMenuItem
-  Gtk.containerAdd menuBar helpImageMenuItem
-  helpImageMenuItem `Gtk.set` [Gtk.menuItemSubmenu := helpMenu]
-  Gtk.containerAdd helpMenu aboutImageMenuItem
-  Gtk.containerAdd vbox table
-  Gtk.tableAttachDefaults table drawingArea 0 1 0 1
-  Gtk.tableAttach table coordLabel 0 1 1 2 [] [] 1 1
-  -- Return window.
+  newImage <- new Gtk.Image [ #iconName := "document-new"
+                            ]
+  newImageMenuItem <- new Gtk.ImageMenuItem [ #label := "_New"
+                                            , #useUnderline := True
+                                            , #image := newImage
+                                            ]
+  openImage <- new Gtk.Image [ #iconName := "document-open"
+                             ]
+  openImageMenuItem <- new Gtk.ImageMenuItem [ #label := "_Open"
+                                             , #useUnderline := True
+                                             , #image := openImage
+                                             ]
+  saveImage <- new Gtk.Image [ #iconName := "document-save"
+                             ]
+  saveImageMenuItem <- new Gtk.ImageMenuItem [ #label := "_Save"
+                                             , #useUnderline := True
+                                             , #image := saveImage
+                                             ]
+  fileSeparatorMenuItem <- new Gtk.SeparatorMenuItem []
+  exitImage <- new Gtk.Image [ #iconName := "application-exit"
+                             ]
+  exitImageMenuItem <- new Gtk.ImageMenuItem [ #label := "_Exit"
+                                             , #useUnderline := True
+                                             , #image := exitImage
+                                             ]
+  fileMenu <- new Gtk.Menu []
+  #add fileMenu newImageMenuItem
+  #add fileMenu openImageMenuItem
+  #add fileMenu saveImageMenuItem
+  #add fileMenu fileSeparatorMenuItem
+  #add fileMenu exitImageMenuItem
+  fileMenuItem <- new Gtk.MenuItem [ #label := "_File"
+                                   , #submenu := fileMenu
+                                   , #useUnderline := True
+                                   ]
+  undoImage <- new Gtk.Image [ #iconName := "edit-undo"
+                             ]
+  undoImageMenuItem <- new Gtk.ImageMenuItem [ #label := "_Undo"
+                                             , #useUnderline := True
+                                             , #image := undoImage
+                                             ]
+  editSeparatorMenuItem <- new Gtk.SeparatorMenuItem []
+  preferencesImage <- new Gtk.Image [ #iconName := "document-properties"
+                                    ]
+  preferencesImageMenuItem <- new Gtk.ImageMenuItem [ #label := "_Preferences"
+                                                    , #useUnderline := True
+                                                    , #image := preferencesImage
+                                                    ]
+  editMenu <- new Gtk.Menu []
+  #add editMenu undoImageMenuItem
+  #add editMenu editSeparatorMenuItem
+  #add editMenu preferencesImageMenuItem
+  editMenuItem <- new Gtk.MenuItem [ #label := "_Edit"
+                                   , #submenu := editMenu
+                                   , #useUnderline := True
+                                   ]
+  aboutImage <- new Gtk.Image [ #iconName := "help-about"
+                              ]
+  aboutImageMenuItem <- new Gtk.ImageMenuItem [ #label := "_About"
+                                              , #useUnderline := True
+                                              , #image := aboutImage
+                                              ]
+  helpMenu <- new Gtk.Menu []
+  #add helpMenu aboutImageMenuItem
+  helpMenuItem <- new Gtk.MenuItem [ #label := "_Help"
+                                   , #submenu := helpMenu
+                                   , #useUnderline := True
+                                   ]
+  menuBar <- new Gtk.MenuBar []
+  #add menuBar fileMenuItem
+  #add menuBar editMenuItem
+  #add menuBar helpMenuItem
+  drawingArea <- new Gtk.DrawingArea []
+  #setHexpand drawingArea True
+  #setVexpand drawingArea True
+  #addEvents drawingArea [ EventMaskButtonPressMask
+                         , EventMaskPointerMotionMask
+                         ]
+  coordLabel <- new Gtk.Label []
+  grid <- new Gtk.Grid []
+  #attach grid drawingArea 0 0 1 1
+  #attach grid coordLabel 0 1 1 1
+  box <- new Gtk.Box [ #orientation := Gtk.OrientationVertical
+                     ]
+  #add box menuBar
+  #add box grid
+  #setChildPacking box grid True True 0 Gtk.PackTypeStart
+  mainWindow <- new Gtk.Window [ #child := box
+                               , #defaultWidth := 800
+                               , #defaultHeight := 600
+                               , #icon := logo
+                               , #title := "Missile"
+                               ]
   return MainWindow { mwWindow = mainWindow
                     , mwNewImageMenuItem = newImageMenuItem
                     , mwOpenImageMenuItem = openImageMenuItem
                     , mwSaveImageMenuItem = saveImageMenuItem
-                    , mwQuitImageMenuItem = quitImageMenuItem
+                    , mwExitImageMenuItem = exitImageMenuItem
                     , mwUndoImageMenuItem = undoImageMenuItem
                     , mwPreferencesImageMenuItem = preferencesImageMenuItem
                     , mwAboutImageMenuItem = aboutImageMenuItem
@@ -232,8 +339,8 @@ mainWindowNew logo = do
 
 withPos :: Gtk.DrawingArea -> Field -> DrawSettings -> Double -> Double -> (Pos -> IO ()) -> IO ()
 withPos drawingArea field drawSettings x y f = do
-  width <- fromIntegral <$> Gtk.widgetGetAllocatedWidth drawingArea
-  height <- fromIntegral <$> Gtk.widgetGetAllocatedHeight drawingArea
+  width <- fromIntegral <$> #getAllocatedWidth drawingArea
+  height <- fromIntegral <$> #getAllocatedHeight drawingArea
   let fieldWidth' = fieldWidth field
       fieldHeight' = fieldHeight field
       hReflection' = dsHReflection drawSettings
@@ -246,85 +353,90 @@ withPos drawingArea field drawSettings x y f = do
 updateCoordLabel :: Gtk.Label -> Gtk.DrawingArea -> Field -> DrawSettings -> Double -> Double -> IO ()
 updateCoordLabel coordLabel drawingArea field drawSettings x y =
   withPos drawingArea field drawSettings x y $ \(posX, posY) -> do
-    let text = show (posX + 1) ++ ":" ++ show (posY + 1)
-    labelText <- Gtk.labelGetText coordLabel
-    when (labelText /= text) $ Gtk.labelSetText coordLabel text
+    let text = pack $ show (posX + 1) ++ ":" ++ show (posY + 1)
+    labelText <- coordLabel `get` #label
+    when (labelText /= text) $ coordLabel `set` [ #label := text
+                                                ]
 
-listenMainWindow :: MainWindow -> Gtk.Pixbuf -> String -> IORef DrawSettings -> IORef Game -> IO ()
+listenMainWindow :: MainWindow -> Pixbuf -> Text -> IORef DrawSettings -> IORef Game -> IO ()
 listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
-  _ <- mwWindow mainWindow `Gtk.on` Gtk.deleteEvent $ liftIO $ do
-    game <- liftIO $ readIORef gameIORef
+  _ <- mwWindow mainWindow `on` #deleteEvent $ \_ -> do
+    game <- readIORef gameIORef
     gameStopBots game 1000000 Gtk.mainQuit
     return False
-  _ <- mwQuitImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $ do
-    game <- liftIO $ readIORef gameIORef
-    Gtk.widgetDestroy $ mwWindow mainWindow
+  _ <- mwExitImageMenuItem mainWindow `on` #activate $ do
+    game <- readIORef gameIORef
+    #destroy $ mwWindow mainWindow
     gameStopBots game 1000000 Gtk.mainQuit
-  _ <- mwAboutImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $ do
-    aboutDialog <- Gtk.aboutDialogNew
-    aboutDialog `Gtk.set` [ Gtk.windowTransientFor := mwWindow mainWindow
-                          , Gtk.aboutDialogProgramName := "Missile"
-                          , Gtk.aboutDialogVersion := "3.0.0"
-                          , Gtk.aboutDialogLicense := Just license
-                          , Gtk.aboutDialogWebsite := "https://gitlab.com/points/missile"
-                          , Gtk.aboutDialogAuthors := ["Evgeny Kurnevsky"]
-                          , Gtk.aboutDialogLogo := Just logo
-                          ]
-    _ <- Gtk.dialogRun aboutDialog
-    Gtk.widgetDestroy aboutDialog
-  _ <- mwPreferencesImageMenuItem mainWindow `Gtk.on` Gtk.menuItemActivated $ liftIO $ do
+  _ <- mwAboutImageMenuItem mainWindow `on` #activate $ do
+    aboutDialog <- new Gtk.AboutDialog [ #authors := ["Evgeny Kurnevsky"]
+                                       , #license := license
+                                       , #logo := logo
+                                       , #programName := "Missile"
+                                       , #transientFor := mwWindow mainWindow
+                                       , #version := "3.0.0"
+                                       , #website := "https://gitlab.com/points/missile"
+                                       ]
+    _ <- #run aboutDialog
+    #destroy aboutDialog
+  _ <- mwPreferencesImageMenuItem mainWindow `on` #activate $ do
     drawSettings <- readIORef drawSettingsIORef
     preferencesDialog <- preferencesDialogNew mainWindow drawSettings
     runPreferencesDialog drawSettings preferencesDialog $ \newSettings -> do
       writeIORef drawSettingsIORef newSettings
-      Gtk.widgetQueueDraw $ mwDrawingArea mainWindow
-  _ <- mwDrawingArea mainWindow `Gtk.on` Gtk.draw $ do
-    drawSettings <- liftIO $ readIORef drawSettingsIORef
-    game <- liftIO $ readIORef gameIORef
-    fields <- liftIO $ gameFields game
-    width' <- liftIO $ Gtk.widgetGetAllocatedWidth $ mwDrawingArea mainWindow
-    height' <- liftIO $ Gtk.widgetGetAllocatedHeight $ mwDrawingArea mainWindow
-    draw drawSettings (fromIntegral width') (fromIntegral height') fields
-  _ <- mwDrawingArea mainWindow `Gtk.on` Gtk.motionNotifyEvent $ do
-    (x, y) <- Gtk.eventCoordinates
-    liftIO $ do
-      drawSettings <- readIORef drawSettingsIORef
-      game <- readIORef gameIORef
-      field <- head <$> gameFields game
-      updateCoordLabel (mwCoordLabel mainWindow) (mwDrawingArea mainWindow) field drawSettings x y
+      #queueDraw $ mwDrawingArea mainWindow
+  _ <- mwDrawingArea mainWindow `on` #draw $ \context -> do
+    drawSettings <- readIORef drawSettingsIORef
+    game <- readIORef gameIORef
+    fields <- gameFields game
+    width' <- #getAllocatedWidth $ mwDrawingArea mainWindow
+    height' <- #getAllocatedHeight $ mwDrawingArea mainWindow
+    flip renderWithContext context $ draw drawSettings (fromIntegral width') (fromIntegral height') fields
     return False
-  _ <- mwCoordLabel mainWindow `Gtk.on` Gtk.draw $ liftIO $ do
-    (x, y) <- Gtk.widgetGetPointer $ mwDrawingArea mainWindow
+  _ <- mwDrawingArea mainWindow `on` #motionNotifyEvent $ \event -> do
+    x <- event `get` #x
+    y <- event `get` #y
     drawSettings <- readIORef drawSettingsIORef
     game <- readIORef gameIORef
     field <- head <$> gameFields game
-    updateCoordLabel (mwCoordLabel mainWindow) (mwDrawingArea mainWindow) field drawSettings (fromIntegral x) (fromIntegral y)
-  _ <- mwDrawingArea mainWindow `Gtk.on` Gtk.buttonPressEvent $ Gtk.tryEvent $ do
-    Gtk.LeftButton <- Gtk.eventButton
-    (x, y) <- Gtk.eventCoordinates
-    liftIO $ do
-      drawSettings <- readIORef drawSettingsIORef
-      game <- readIORef gameIORef
-      field <- head <$> gameFields game
-      withPos (mwDrawingArea mainWindow) field drawSettings x y $ \pos -> gamePutPoint game pos
+    updateCoordLabel (mwCoordLabel mainWindow) (mwDrawingArea mainWindow) field drawSettings x y
+    return False
+  _ <- mwDrawingArea mainWindow `on` #buttonPressEvent $ \event -> do
+    button <- event `get` #button
+    when (button == 1) $
+      do x <- event `get` #x
+         y <- event `get` #y
+         drawSettings <- readIORef drawSettingsIORef
+         game <- readIORef gameIORef
+         field <- head <$> gameFields game
+         withPos (mwDrawingArea mainWindow) field drawSettings x y $ \pos -> gamePutPoint game pos
+    return False
   return ()
 
 main :: IO ()
 main = do
   cliArguments <- execParser $ info cliArgumentsParser (fullDesc <> progDesc "Points game.")
-  _ <- Gtk.initGUI
-  logo <- Gtk.pixbufNewFromFile "Logo.png"
-  license <- readFile "LICENSE.txt"
+  _ <- Gtk.init Nothing
+  logo <- pixbufNewFromFile "Logo.png"
+  license <- TextIO.readFile "LICENSE.txt"
   mainWindow <- mainWindowNew logo
-  let callbackError player = Gtk.postGUIAsync $ do
-        messageDialog <- Gtk.messageDialogNew (Just $ mwWindow mainWindow) [] Gtk.MessageError Gtk.ButtonsOk $ show player ++ " bot made a mistake. It was killed."
-        _ <- Gtk.dialogRun messageDialog
-        Gtk.widgetDestroy messageDialog
-      callback = Gtk.postGUIAsync $ Gtk.widgetQueueDraw $ mwDrawingArea mainWindow
+  let callbackError player = postGUIASync $ do
+        messageDialog <- new Gtk.MessageDialog [ #buttons := Gtk.ButtonsTypeOk
+                                               , #messageType := Gtk.MessageTypeError
+                                               , #text := pack $ show player ++ " bot made a mistake. It was killed."
+                                               , #transientFor := mwWindow mainWindow
+                                               ]
+        _ <- #run messageDialog
+        #destroy messageDialog
+      callback = postGUIASync $ #queueDraw $ mwDrawingArea mainWindow
   game <- gameNew (cliGameSettings cliArguments) callbackError callback
   gameInitBots game
   gameIORef <- newIORef game
-  drawSettingsIORef <- newIORef $ cliDawSettings cliArguments
+  let drawSettings = cliDrawSettings cliArguments
+  drawSettingsIORef <- newIORef drawSettings
   listenMainWindow mainWindow logo license drawSettingsIORef gameIORef
-  Gtk.widgetShowAll (mwWindow mainWindow)
-  Gtk.mainGUI
+  #showAll (mwWindow mainWindow)
+  postGUIASync $ do (x, y) <- #getPointer $ mwDrawingArea mainWindow
+                    field <- head <$> gameFields game
+                    updateCoordLabel (mwCoordLabel mainWindow) (mwDrawingArea mainWindow) field drawSettings (fromIntegral x) (fromIntegral y)
+  Gtk.main

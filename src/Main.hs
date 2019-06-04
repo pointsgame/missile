@@ -9,6 +9,8 @@ import Data.Text ( Text
                  )
 import Data.Text.IO as TextIO ( readFile
                               )
+import Data.Version ( showVersion
+                    )
 import Control.Monad
 import Options.Applicative
 import qualified GI.Gtk as Gtk
@@ -32,6 +34,8 @@ import GI.Gdk.Structs ( RGBA
 import GI.GdkPixbuf.Objects.Pixbuf ( Pixbuf
                                    , pixbufNewFromFile
                                    )
+import Paths_missile ( version
+                     )
 import Field
 import Game
 import Rendering
@@ -374,7 +378,7 @@ listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
                                        , #logo := logo
                                        , #programName := "Missile"
                                        , #transientFor := mwWindow mainWindow
-                                       , #version := "3.0.0"
+                                       , #version := pack $ showVersion version
                                        , #website := "https://gitlab.com/points/missile"
                                        ]
     _ <- #run aboutDialog

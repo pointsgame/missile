@@ -1,5 +1,5 @@
 name:                missile
-version:             4.0.0
+version:             5.0.0
 license:             AGPL-3
 license-file:        LICENSE.txt
 author:              kurnevsky
@@ -20,7 +20,8 @@ executable missile
                       ContBot,
                       Game,
                       GameSettings,
-                      Cli
+                      Cli,
+                      Paths_missile
   build-depends:      base,
                       array,
                       containers,

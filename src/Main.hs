@@ -159,9 +159,9 @@ preferencesDialogNew mainWindow startSettings =
                                                    ]
      pointRadiusLabel <- new Gtk.Label [ #label := "Point radius"
                                        ]
-     pointRadiusAdjustment <- new Gtk.Adjustment [ #lower := 0.1
+     pointRadiusAdjustment <- new Gtk.Adjustment [ #lower := 0.5
                                                  , #stepIncrement := 0.1
-                                                 , #upper := 10
+                                                 , #upper := 2
                                                  , #value := dsPointRadius startSettings
                                                  ]
      pointRadiusSpinButton <- new Gtk.SpinButton [ #adjustment := pointRadiusAdjustment

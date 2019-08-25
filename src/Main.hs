@@ -24,6 +24,7 @@ import Data.GI.Gtk.Threading ( postGUIASync
                              )
 import GI.Cairo.Render.Connector ( renderWithContext
                                  )
+import qualified GI.Cairo.Render as Cairo
 import GI.Gdk.Flags ( EventMask ( EventMaskButtonPressMask
                                 , EventMaskPointerMotionMask
                                 )
@@ -45,6 +46,7 @@ data MainWindow = MainWindow { mwWindow :: Gtk.Window
                              , mwNewImageMenuItem :: Gtk.ImageMenuItem
                              , mwOpenImageMenuItem :: Gtk.ImageMenuItem
                              , mwSaveImageMenuItem :: Gtk.ImageMenuItem
+                             , mwExportAsSvgMenuItem :: Gtk.MenuItem
                              , mwExitImageMenuItem :: Gtk.ImageMenuItem
                              , mwUndoImageMenuItem :: Gtk.ImageMenuItem
                              , mwPreferencesImageMenuItem :: Gtk.ImageMenuItem
@@ -254,6 +256,9 @@ mainWindowNew logo = do
                                              , #useUnderline := True
                                              , #image := saveImage
                                              ]
+  exportAsSvgMenuItem <- new Gtk.MenuItem [ #label := "_Export as SVG"
+                                          , #useUnderline := True
+                                          ]
   fileSeparatorMenuItem <- new Gtk.SeparatorMenuItem []
   exitImage <- new Gtk.Image [ #iconName := "application-exit"
                              ]
@@ -265,6 +270,7 @@ mainWindowNew logo = do
   #add fileMenu newImageMenuItem
   #add fileMenu openImageMenuItem
   #add fileMenu saveImageMenuItem
+  #add fileMenu exportAsSvgMenuItem
   #add fileMenu fileSeparatorMenuItem
   #add fileMenu exitImageMenuItem
   fileMenuItem <- new Gtk.MenuItem [ #label := "_File"
@@ -333,6 +339,7 @@ mainWindowNew logo = do
                     , mwNewImageMenuItem = newImageMenuItem
                     , mwOpenImageMenuItem = openImageMenuItem
                     , mwSaveImageMenuItem = saveImageMenuItem
+                    , mwExportAsSvgMenuItem = exportAsSvgMenuItem
                     , mwExitImageMenuItem = exitImageMenuItem
                     , mwUndoImageMenuItem = undoImageMenuItem
                     , mwPreferencesImageMenuItem = preferencesImageMenuItem
@@ -362,6 +369,15 @@ updateCoordLabel coordLabel drawingArea field drawSettings x y =
     when (labelText /= text) $ coordLabel `set` [ #label := text
                                                 ]
 
+drawToSvg :: String -> DrawSettings -> [Field] -> IO ()
+drawToSvg filename drawSettings fields =
+  let field = head fields
+      fieldWidth' = fieldWidth field
+      fieldHeight' = fieldHeight field
+      width = 800
+      height = width / fromIntegral fieldWidth' * fromIntegral fieldHeight'
+  in Cairo.withSVGSurface filename width height $ flip Cairo.renderWith $ draw drawSettings width height fields
+
 listenMainWindow :: MainWindow -> Pixbuf -> Text -> IORef DrawSettings -> IORef Game -> IO ()
 listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
   _ <- mwWindow mainWindow `on` #deleteEvent $ \_ -> do
@@ -389,6 +405,30 @@ listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
     runPreferencesDialog drawSettings preferencesDialog $ \newSettings -> do
       writeIORef drawSettingsIORef newSettings
       #queueDraw $ mwDrawingArea mainWindow
+  _ <- mwExportAsSvgMenuItem mainWindow `on` #activate $ do
+    fileFilter <- new Gtk.FileFilter []
+    #addPattern fileFilter "*.svg"
+    fileChooserDialog <- new Gtk.FileChooserDialog [ #action := Gtk.FileChooserActionSave
+                                                   , #doOverwriteConfirmation := True
+                                                   , #filter := fileFilter
+                                                   , #transientFor := mwWindow mainWindow
+                                                   ]
+    _ <- #addButton fileChooserDialog "_Cancel" $ (fromIntegral . fromEnum) Gtk.ResponseTypeCancel
+    _ <- #addButton fileChooserDialog "_Save" $ (fromIntegral . fromEnum) Gtk.ResponseTypeAccept
+    response <- fmap (toEnum . fromIntegral) $ #run fileChooserDialog
+    case response of
+      Gtk.ResponseTypeCancel      -> #destroy fileChooserDialog
+      Gtk.ResponseTypeDeleteEvent -> #destroy fileChooserDialog
+      Gtk.ResponseTypeAccept      -> do maybeFilename <- #getFilename fileChooserDialog
+                                        case maybeFilename of
+                                          Just filename -> do
+                                            drawSettings <- readIORef drawSettingsIORef
+                                            game <- readIORef gameIORef
+                                            fields <- gameFields game
+                                            drawToSvg filename drawSettings fields
+                                          Nothing -> return ()
+                                        #destroy fileChooserDialog
+      _                           -> error $ "runFileChooserDialog: unexpected response: " ++ show response
   _ <- mwDrawingArea mainWindow `on` #draw $ \context -> do
     drawSettings <- readIORef drawSettingsIORef
     game <- readIORef gameIORef

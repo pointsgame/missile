@@ -1,6 +1,8 @@
 Missile
 ====
 
+![Logo](/Logo.svg)
+
 Missile is a GUI for the game of points.
 
 It's written in haskell language and implements "points console AI protocol v6" for playing with bots.

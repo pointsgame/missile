@@ -421,7 +421,7 @@ main :: IO ()
 main = do
   cliArguments <- execParser $ info cliArgumentsParser (fullDesc <> progDesc "Points game.")
   _ <- Gtk.init Nothing
-  logo <- pixbufNewFromFile "Logo.png"
+  logo <- pixbufNewFromFile "Logo.svg"
   license <- TextIO.readFile "LICENSE.txt"
   mainWindow <- mainWindowNew logo
   let callbackError player = postGUIASync $ do

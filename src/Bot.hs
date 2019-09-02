@@ -115,7 +115,7 @@ play bot pos player =
      botQuestion bot $ "play " ++ strX ++ " " ++ strY ++ " " ++ strPlayer
      ("play" : answerX : answerY : [answerPlayer]) <- botAnswer bot
      when (answerX /= strX || answerY /= strY || answerPlayer /= strPlayer) $
-       error "play: invalid answer."
+       fail "play: invalid answer."
 
 genMove :: Bot -> Player -> IO Pos
 genMove bot player =
@@ -125,7 +125,7 @@ genMove bot player =
      let intX = read answerX
          intY = read answerY
      if answerPlayer /= strPlayer || intX < 0 || intY < 0
-       then error "genMove: invalid answer."
+       then fail "genMove: invalid answer."
        else return (intX, intY)
 
 genMoveWithComplexity :: Bot -> Player -> Int -> IO Pos
@@ -136,7 +136,7 @@ genMoveWithComplexity bot player complexity =
      let intX = read answerX
          intY = read answerY
      if answerPlayer /= strPlayer || intX < 0 || intY < 0
-       then error "genMoveWithComplexity: invalid answer."
+       then fail "genMoveWithComplexity: invalid answer."
        else return (intX, intY)
 
 genMoveWithTime :: Bot -> Player -> Int -> IO Pos
@@ -147,7 +147,7 @@ genMoveWithTime bot player time =
      let intX = read answerX
          intY = read answerY
      if answerPlayer /= strPlayer || intX < 0 || intY < 0
-       then error "genMoveWithTime: invalid answer."
+       then fail "genMoveWithTime: invalid answer."
        else return (intX, intY)
 
 undo :: Bot -> IO ()

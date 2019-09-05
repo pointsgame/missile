@@ -8,17 +8,15 @@ module Game ( Game
             ) where
 
 import Data.IORef
-import Control.Concurrent
+import Control.Exception
 import Control.Monad
-import Control.Monad.Trans.Cont
-import Control.Monad.Trans.Class
 import System.Random
+import Async
 import Player
 import Field
 import GameTree
 import GameSettings
 import Bot
-import ContBot
 
 data Game = Game { gGameTree :: IORef GameTree
                  , gGameSettings :: IORef GameSettings
@@ -27,25 +25,7 @@ data Game = Game { gGameTree :: IORef GameTree
                  , gRedBot :: IORef (Maybe Bot)
                  , gBlackBot :: IORef (Maybe Bot)
                  , gCallback :: IO ()
-                 , gError :: Player -> IO ()
                  }
-
-parallelC :: ContT () IO a -> ContT () IO b -> ContT () IO (a, b)
-parallelC c1 c2 = do
-  aMVar <- lift newEmptyMVar
-  bMVar <- lift newEmptyMVar
-  _ <- lift $ forkIO $ runContT c1 $ putMVar aMVar
-  _ <- lift $ forkIO $ runContT c2 $ putMVar bMVar
-  a <- lift $ takeMVar aMVar
-  b <- lift $ takeMVar bMVar
-  return (a, b)
-
-asyncC :: ContT () IO a -> ContT () IO a
-asyncC (ContT f) =
-  ContT $ void . forkIO . f
-
-parallelAsyncC :: ContT () IO a -> ContT () IO b -> ContT () IO (a, b)
-parallelAsyncC c1 c2 = asyncC $ parallelC c1 c2
 
 gameGameTree :: Game -> IO GameTree
 gameGameTree = readIORef . gGameTree
@@ -62,97 +42,98 @@ gameBotIORef game player =
 gameBot :: Game -> Player -> IO (Maybe Bot)
 gameBot game = readIORef . gameBotIORef game
 
-genMoveByType :: GenMoveType -> Bot -> Player -> IO () -> ContT () IO Pos
-genMoveByType Simple bot player = contGenMove bot player
-genMoveByType (WithTime time) bot player = contGenMoveWithTime bot player time
-genMoveByType (WithComplexity complexity) bot player = contGenMoveWithComplexity bot player complexity
+genMoveByType :: GenMoveType -> Bot -> Player -> Async Pos
+genMoveByType Simple bot player = async $ genMove bot player
+genMoveByType (WithTime time) bot player = async $ genMoveWithTime bot player time
+genMoveByType (WithComplexity complexity) bot player = async $ genMoveWithComplexity bot player complexity
 
-botError :: Game -> Player -> IO ()
-botError game player = do
-  let botIORef = gameBotIORef game player
-  maybeBot <- readIORef botIORef
-  case maybeBot of
-    Just _ -> do evalContT $ stopBot botIORef 100 >> lift (writeIORef (gBusy game) False)
-                 gError game player
-    Nothing -> return ()
+-- botError :: Game -> Player -> IO ()
+-- botError game player = do
+--   let botIORef = gameBotIORef game player
+--   maybeBot <- readIORef botIORef
+--   case maybeBot of
+--     Just _ -> do evalContT $ stopBot botIORef 100 >> lift (writeIORef (gBusy game) False)
+--                  gError game player
+--     Nothing -> return ()
 
-gameBotsPutPoint :: Game -> Pos -> Player -> ContT () IO ()
+gameBotsPutPoint :: Game -> Pos -> Player -> Async ()
 gameBotsPutPoint game pos player = do
-  maybeRedBot <- lift $ readIORef $ gRedBot game
-  maybeBlackBot <- lift $ readIORef $ gBlackBot game
-  let continue = lift $ return ()
-      c1 = maybe continue (\bot -> contPlay bot pos player $ botError game Red) maybeRedBot
-      c2 = maybe continue (\bot -> contPlay bot pos player $ botError game Black) maybeBlackBot
-  void $ parallelAsyncC c1 c2
+  maybeRedBot <- now $ readIORef $ gRedBot game
+  maybeBlackBot <- now $ readIORef $ gBlackBot game
+  let continue = now $ return ()
+      c1 = maybe continue (\bot -> async $ play bot pos player) maybeRedBot
+      c2 = maybe continue (\bot -> async $ play bot pos player) maybeBlackBot
+  void $ concurrently c1 c2
 
-gamePlayLoop :: Game -> ContT () IO ()
+gamePlayLoop :: Game -> Async ()
 gamePlayLoop game =
-  callCC $ \exit1 ->
-    callCC $ \exit2 -> do
-      pause <- lift $ readIORef $ gPause game
-      when pause $ exit1 ()
-      gameTree <- lift $ readIORef $ gGameTree game
-      when (gameTreeIsOver gameTree) $ exit1 ()
-      let player = gtCurPlayer gameTree
-      maybeBot <- lift $ gameBot game player
-      pos <- case maybeBot of
-        Just bot -> do
-          gameSettings <- lift $ readIORef $ gGameSettings game
-          genMoveByType (gsGenMoveType gameSettings) bot player $ botError game player
-        Nothing -> exit2 ()
-      unless (isGameTreePuttingAllowed gameTree pos) $ lift (botError game player) >> exit1 ()
-      let newGameTree = putGameTreePlayersPoint pos player gameTree
-      lift $ writeIORef (gGameTree game) newGameTree
-      lift $ gCallback game
-      gameBotsPutPoint game pos player
-      gamePlayLoop game
+  callAA $ \exit1 ->
+    callAA $ \exit2 ->
+      callEE $ \exit3 -> do
+        pause <- now $ readIORef $ gPause game
+        when pause $ exit1 ()
+        gameTree <- now $ readIORef $ gGameTree game
+        when (gameTreeIsOver gameTree) $ exit1 ()
+        let player = gtCurPlayer gameTree
+        maybeBot <- now $ gameBot game player
+        pos <- case maybeBot of
+          Just bot -> do
+            gameSettings <- now $ readIORef $ gGameSettings game
+            genMoveByType (gsGenMoveType gameSettings) bot player
+          Nothing -> exit2 ()
+        unless (isGameTreePuttingAllowed gameTree pos) $ exit3 $ SomeException $ ErrorCall $ "Wrong move" ++ show pos
+        let newGameTree = putGameTreePlayersPoint pos player gameTree
+        now $ writeIORef (gGameTree game) newGameTree
+        now $ gCallback game
+        gameBotsPutPoint game pos player
+        gamePlayLoop game
 
-playBotMoves :: Bot -> [(Pos, Player)] -> IO () -> ContT () IO ()
-playBotMoves bot moves' callbackError =
-  forM_ moves' $ \(pos, player) -> contPlay bot pos player callbackError
+playBotMoves :: Bot -> [(Pos, Player)] -> Async ()
+playBotMoves bot moves' =
+  forM_ moves' $ \(pos, player) -> async $ play bot pos player
 
-initBot :: GameTree -> String -> IO () -> ContT () IO Bot
-initBot gameTree path callbackError = do --todo callcc and continue in case of failure, kill failed bot
-  bot <- contRun path callbackError
-  seed <- lift randomIO
-  contInit bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) (abs seed) callbackError
-  playBotMoves bot (moves $ head $ gtFields gameTree) callbackError
+initBot :: GameTree -> String -> Async Bot
+initBot gameTree path = do --todo callcc and continue in case of failure, kill failed bot
+  bot <- async $ run path
+  seed <- now randomIO
+  async $ Bot.init bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) (abs seed)
+  playBotMoves bot (moves $ head $ gtFields gameTree)
   return bot
 
-stopBot :: IORef (Maybe Bot) -> Int -> ContT () IO ()
+stopBot :: IORef (Maybe Bot) -> Int -> Async ()
 stopBot botIORef delay = do
-  maybeBot <- lift $ readIORef botIORef
-  lift $ writeIORef botIORef Nothing
-  forM_ maybeBot (`contStop` delay)
+  maybeBot <- now $ readIORef botIORef
+  now $ writeIORef botIORef Nothing
+  async $ forM_ maybeBot (`stop` delay)
 
-stopBots :: Game -> Int -> ContT () IO ()
+stopBots :: Game -> Int -> Async ()
 stopBots game delay = do
   let c1 = stopBot (gRedBot game) delay
       c2 = stopBot (gBlackBot game) delay
-  void $ parallelAsyncC c1 c2
+  void $ concurrently c1 c2
 
-initBots :: Game -> ContT () IO ()
+initBots :: Game -> Async ()
 initBots game = do
-  gameSettings <- lift $ readIORef $ gGameSettings game
-  gameTree <- lift $ readIORef $ gGameTree game
-  let c1 = forM (gsRedBotPath gameSettings) $ flip (initBot gameTree) $ botError game Red
-      c2 = forM (gsBlackBotPath gameSettings) $ flip (initBot gameTree) $ botError game Black
-  (maybeRedBot, maybeBlackBot) <- parallelAsyncC c1 c2
-  lift $ writeIORef (gRedBot game) maybeRedBot
-  lift $ writeIORef (gBlackBot game) maybeBlackBot
+  gameSettings <- now $ readIORef $ gGameSettings game
+  gameTree <- now $ readIORef $ gGameTree game
+  let c1 = forM (gsRedBotPath gameSettings) $ initBot gameTree
+      c2 = forM (gsBlackBotPath gameSettings) $ initBot gameTree
+  (maybeRedBot, maybeBlackBot) <- concurrently c1 c2
+  now $ writeIORef (gRedBot game) maybeRedBot
+  now $ writeIORef (gBlackBot game) maybeBlackBot
 
-unlessBusy :: IORef Bool -> ContT () IO () -> ContT () IO ()
+unlessBusy :: IORef Bool -> Async () -> Async ()
 unlessBusy busyIORef c = do
-  busy <- lift $ readIORef busyIORef
+  busy <- now $ readIORef busyIORef
   unless busy c
 
-withBusy :: IORef Bool -> ContT () IO () -> ContT () IO ()
+withBusy :: IORef Bool -> Async () -> Async ()
 withBusy busyIORef c = do
-  lift $ writeIORef busyIORef True
+  now $ writeIORef busyIORef True
   c
-  lift $ writeIORef busyIORef False
+  now $ writeIORef busyIORef False
 
-unlessWithBusy :: IORef Bool -> ContT () IO () -> ContT () IO ()
+unlessWithBusy :: IORef Bool -> Async () -> Async ()
 unlessWithBusy busyIORef = unlessBusy busyIORef . withBusy busyIORef
 
 crossMoves :: Int -> Int -> Player -> [(Pos, Player)]
@@ -174,8 +155,8 @@ beginPatternGameTree :: BeginPattern -> Int -> Int -> GameTree
 beginPatternGameTree beginPattern width height =
   buildGameTree $ beginPatternFields beginPattern Red width height
 
-gameLoad :: GameTree -> GameSettings -> (Player -> IO ()) -> IO () -> IO Game
-gameLoad gameTree gameSettings callbackError callback = do
+gameLoad :: GameTree -> GameSettings -> IO () -> IO Game
+gameLoad gameTree gameSettings callback = do
   gameTreeIORef <- newIORef gameTree
   gameSettingsIORef <- newIORef gameSettings
   busyIORef <- newIORef False
@@ -189,42 +170,39 @@ gameLoad gameTree gameSettings callbackError callback = do
               , gRedBot = redBotIORef
               , gBlackBot = blackBotIORef
               , gCallback = callback
-              , gError = callbackError
               }
 
-gameNew :: GameSettings -> (Player -> IO ()) -> IO () -> IO Game
+gameNew :: GameSettings -> IO () -> IO Game
 gameNew gameSettings =
   let gameTree = beginPatternGameTree (gsBeginPattern gameSettings) (gsWidth gameSettings) (gsHeight gameSettings)
   in gameLoad gameTree gameSettings
 
-gameInitBots :: Game -> IO ()
+gameInitBots :: Game -> Async ()
 gameInitBots game =
-  evalContT $ unlessWithBusy (gBusy game) $ do
+  unlessWithBusy (gBusy game) $ do
     initBots game
     gamePlayLoop game
 
-gamePlay :: Game -> IO ()
+gamePlay :: Game -> Async ()
 gamePlay game =
-  evalContT $ unlessWithBusy (gBusy game) $ gamePlayLoop game
+  unlessWithBusy (gBusy game) $ gamePlayLoop game
 
-gamePutPoint :: Game -> Pos -> IO ()
+gamePutPoint :: Game -> Pos -> Async ()
 gamePutPoint game pos =
-  evalContT $ callCC $ \exit -> do
-    gameTree <- lift $ readIORef $ gGameTree game
+  callAA $ \exit -> do
+    gameTree <- now $ readIORef $ gGameTree game
     unless (isGameTreePuttingAllowed gameTree pos) $ exit ()
-    busy <- lift $ readIORef $ gBusy game
+    busy <- now $ readIORef $ gBusy game
     when busy $ exit ()
-    lift $ writeIORef (gBusy game) True
+    now $ writeIORef (gBusy game) True
     let player = gtCurPlayer gameTree
         newGameTree = putGameTreePlayersPoint pos player gameTree
-    lift $ writeIORef (gGameTree game) newGameTree
-    lift $ gCallback game
+    now $ writeIORef (gGameTree game) newGameTree
+    now $ gCallback game
     gameBotsPutPoint game pos player
     gamePlayLoop game
-    lift $ writeIORef (gBusy game) False
+    now $ writeIORef (gBusy game) False
 
-gameStopBots :: Game -> Int -> IO () -> IO ()
-gameStopBots game delay callback =
-  evalContT $ do
-    withBusy (gBusy game) $ stopBots game delay
-    lift callback
+gameStopBots :: Game -> Int -> Async ()
+gameStopBots game delay =
+  withBusy (gBusy game) $ stopBots game delay

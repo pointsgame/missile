@@ -11,6 +11,7 @@ import Data.Text.IO as TextIO ( readFile
                               )
 import Data.Version ( showVersion
                     )
+import Control.Exception
 import Control.Monad
 import Options.Applicative
 import qualified GI.Gtk as Gtk
@@ -37,6 +38,7 @@ import GI.GdkPixbuf.Objects.Pixbuf ( Pixbuf
                                    )
 import Paths_missile ( version
                      )
+import Async
 import Field
 import Game
 import Rendering
@@ -378,16 +380,16 @@ drawToSvg filename drawSettings fields =
       height = width / fromIntegral fieldWidth' * fromIntegral fieldHeight'
   in Cairo.withSVGSurface filename width height $ flip Cairo.renderWith $ draw drawSettings width height fields
 
-listenMainWindow :: MainWindow -> Pixbuf -> Text -> IORef DrawSettings -> IORef Game -> IO ()
-listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
+listenMainWindow :: MainWindow -> Pixbuf -> Text -> IORef DrawSettings -> IORef Game -> (SomeException -> IO ()) -> IO ()
+listenMainWindow mainWindow logo license drawSettingsIORef gameIORef callbackError = do
   _ <- mwWindow mainWindow `on` #deleteEvent $ \_ -> do
     game <- readIORef gameIORef
-    gameStopBots game 1000000 Gtk.mainQuit
+    evalAsync (const $ return ()) $ gameStopBots game 1000000 >> now Gtk.mainQuit
     return False
   _ <- mwExitImageMenuItem mainWindow `on` #activate $ do
     game <- readIORef gameIORef
     #destroy $ mwWindow mainWindow
-    gameStopBots game 1000000 Gtk.mainQuit
+    evalAsync (const $ return ()) $ gameStopBots game 1000000 >> now Gtk.mainQuit
   _ <- mwAboutImageMenuItem mainWindow `on` #activate $ do
     aboutDialog <- new Gtk.AboutDialog [ #authors := ["Evgeny Kurnevsky"]
                                        , #license := license
@@ -453,7 +455,7 @@ listenMainWindow mainWindow logo license drawSettingsIORef gameIORef = do
          drawSettings <- readIORef drawSettingsIORef
          game <- readIORef gameIORef
          field <- head <$> gameFields game
-         withPos (mwDrawingArea mainWindow) field drawSettings x y $ \pos -> gamePutPoint game pos
+         withPos (mwDrawingArea mainWindow) field drawSettings x y $ evalAsync callbackError . gamePutPoint game
     return False
   return ()
 
@@ -464,21 +466,21 @@ main = do
   logo <- pixbufNewFromFile "Logo.svg"
   license <- TextIO.readFile "LICENSE.txt"
   mainWindow <- mainWindowNew logo
-  let callbackError player = postGUIASync $ do
+  let callbackError exception = postGUIASync $ do -- todo kill bots?
         messageDialog <- new Gtk.MessageDialog [ #buttons := Gtk.ButtonsTypeOk
                                                , #messageType := Gtk.MessageTypeError
-                                               , #text := pack $ show player ++ " bot made a mistake. It was killed."
+                                               , #text := pack $ "Bot made a mistake: " ++ show exception
                                                , #transientFor := mwWindow mainWindow
                                                ]
         _ <- #run messageDialog
         #destroy messageDialog
       callback = postGUIASync $ #queueDraw $ mwDrawingArea mainWindow
-  game <- gameNew (cliGameSettings cliArguments) callbackError callback
-  gameInitBots game
+  game <- gameNew (cliGameSettings cliArguments) callback
+  evalAsync callbackError $ gameInitBots game
   gameIORef <- newIORef game
   let drawSettings = cliDrawSettings cliArguments
   drawSettingsIORef <- newIORef drawSettings
-  listenMainWindow mainWindow logo license drawSettingsIORef gameIORef
+  listenMainWindow mainWindow logo license drawSettingsIORef gameIORef callbackError
   #showAll (mwWindow mainWindow)
   postGUIASync $ do (x, y) <- #getPointer $ mwDrawingArea mainWindow
                     field <- head <$> gameFields game

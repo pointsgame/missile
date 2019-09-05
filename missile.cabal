@@ -11,13 +11,12 @@ executable missile
   hs-source-dirs:     src
   main-is:            Main.hs
   other-modules:      Auxiliary,
+                      Async,
                       Player,
                       Field,
                       GameTree,
                       Rendering,
                       Bot,
-                      AsyncBot,
-                      ContBot,
                       Game,
                       GameSettings,
                       Cli,
@@ -37,6 +36,7 @@ executable missile
                       split,
                       text,
                       transformers,
+                      profunctors,
                       process,
                       --bytestring,
                       colour,

@@ -8,7 +8,7 @@ data GenMoveType = Simple | WithTime Int | WithComplexity Int
 instance Default GenMoveType where
   def = Simple
 
-data BeginPattern = Empty | Cross | TwoCrosses -- TripleCross
+data BeginPattern = Empty | Cross | TwoCrosses | TripleCross
   deriving (Eq, Show, Read)
 
 instance Default BeginPattern where

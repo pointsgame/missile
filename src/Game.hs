@@ -149,6 +149,18 @@ twoCrossesMoves player width height =
   , ((width `div` 2 + 1, height `div` 2), nextPlayer player)
   ]
 
+tripleCrossMoves :: Player -> Int -> Int -> [(Pos, Player)]
+tripleCrossMoves player width height =
+  [ ((width `div` 2 - 1, height `div` 2 - 1), player)
+  , ((width `div` 2 - 1, height `div` 2), nextPlayer player)
+  , ((width `div` 2, height `div` 2), player)
+  , ((width `div` 2, height `div` 2 - 1), nextPlayer player)
+  , ((width `div` 2 + 1, height `div` 2 - 1), player)
+  , ((width `div` 2, height `div` 2 - 2), nextPlayer player)
+  , ((width `div` 2, height `div` 2 + 1), player)
+  , ((width `div` 2 + 1, height `div` 2), nextPlayer player)
+  ]
+
 playFieldMoves :: [Field] -> [(Pos, Player)] -> [Field]
 playFieldMoves = foldl $ \fields (pos, player) -> putPoint pos player (head fields) : fields
 
@@ -156,6 +168,7 @@ beginPatternMoves :: BeginPattern -> Player -> Int -> Int -> [(Pos, Player)]
 beginPatternMoves Empty = const $ const $ const []
 beginPatternMoves Cross = crossMoves
 beginPatternMoves TwoCrosses = twoCrossesMoves
+beginPatternMoves TripleCross = tripleCrossMoves
 
 beginPatternFields :: BeginPattern -> Player -> Int -> Int -> [Field]
 beginPatternFields beginPattern player width height =

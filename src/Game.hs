@@ -10,6 +10,7 @@ module Game ( Game
 import Data.IORef
 import Control.Exception
 import Control.Monad
+import Control.Monad.Trans.Except
 import System.Random
 import Async
 import Player
@@ -46,15 +47,6 @@ genMoveByType :: GenMoveType -> Bot -> Player -> Async Pos
 genMoveByType Simple bot player = async $ genMove bot player
 genMoveByType (WithTime time) bot player = async $ genMoveWithTime bot player time
 genMoveByType (WithComplexity complexity) bot player = async $ genMoveWithComplexity bot player complexity
-
--- botError :: Game -> Player -> IO ()
--- botError game player = do
---   let botIORef = gameBotIORef game player
---   maybeBot <- readIORef botIORef
---   case maybeBot of
---     Just _ -> do evalContT $ stopBot botIORef 100 >> lift (writeIORef (gBusy game) False)
---                  gError game player
---     Nothing -> return ()
 
 gameBotsPutPoint :: Game -> Pos -> Player -> Async ()
 gameBotsPutPoint game pos player = do
@@ -93,11 +85,12 @@ playBotMoves bot moves' =
   forM_ moves' $ \(pos, player) -> async $ play bot pos player
 
 initBot :: GameTree -> String -> Async Bot
-initBot gameTree path = do --todo callcc and continue in case of failure, kill failed bot
+initBot gameTree path = do
   bot <- async $ run path
   seed <- now randomIO
-  async $ Bot.init bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) (abs seed)
-  playBotMoves bot (moves $ head $ gtFields gameTree)
+  let f e' = async (stop bot 100) >> err e'
+  flip catchE f $ async $ Bot.init bot (gameTreeWidth gameTree) (gameTreeHeight gameTree) (abs seed)
+  flip catchE f $ playBotMoves bot (moves $ head $ gtFields gameTree)
   return bot
 
 stopBot :: IORef (Maybe Bot) -> Int -> Async ()
@@ -116,11 +109,11 @@ initBots :: Game -> Async ()
 initBots game = do
   gameSettings <- now $ readIORef $ gGameSettings game
   gameTree <- now $ readIORef $ gGameTree game
-  let c1 = forM (gsRedBotPath gameSettings) $ initBot gameTree
-      c2 = forM (gsBlackBotPath gameSettings) $ initBot gameTree
-  (maybeRedBot, maybeBlackBot) <- concurrently c1 c2
-  now $ writeIORef (gRedBot game) maybeRedBot
-  now $ writeIORef (gBlackBot game) maybeBlackBot
+  let c1 = do maybeRedBot <- forM (gsRedBotPath gameSettings) $ initBot gameTree
+              now $ writeIORef (gRedBot game) maybeRedBot
+      c2 = do maybeBlackBot <- forM (gsBlackBotPath gameSettings) $ initBot gameTree
+              now $ writeIORef (gBlackBot game) maybeBlackBot
+  void $ concurrently c1 c2
 
 unlessBusy :: IORef Bool -> Async () -> Async ()
 unlessBusy busyIORef c = do

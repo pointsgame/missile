@@ -129,20 +129,37 @@ withBusy busyIORef c = do
 unlessWithBusy :: IORef Bool -> Async () -> Async ()
 unlessWithBusy busyIORef = unlessBusy busyIORef . withBusy busyIORef
 
-crossMoves :: Int -> Int -> Player -> [(Pos, Player)]
-crossMoves width height player =
+crossMoves :: Player -> Int -> Int -> [(Pos, Player)]
+crossMoves player width height =
   [ ((width `div` 2 - 1, height `div` 2 - 1), player)
-  , ((width `div` 2, height `div` 2 - 1), nextPlayer player)
-  , ((width `div` 2, height `div` 2), player)
   , ((width `div` 2 - 1, height `div` 2), nextPlayer player)
+  , ((width `div` 2, height `div` 2), player)
+  , ((width `div` 2, height `div` 2 - 1), nextPlayer player)
+  ]
+
+twoCrossesMoves :: Player -> Int -> Int -> [(Pos, Player)]
+twoCrossesMoves player width height =
+  [ ((width `div` 2 - 2, height `div` 2 - 1), player)
+  , ((width `div` 2 - 2, height `div` 2), nextPlayer player)
+  , ((width `div` 2 - 1, height `div` 2), player)
+  , ((width `div` 2 - 1, height `div` 2 - 1), nextPlayer player)
+  , ((width `div` 2, height `div` 2), player)
+  , ((width `div` 2, height `div` 2 - 1), nextPlayer player)
+  , ((width `div` 2 + 1, height `div` 2 - 1), player)
+  , ((width `div` 2 + 1, height `div` 2), nextPlayer player)
   ]
 
 playFieldMoves :: [Field] -> [(Pos, Player)] -> [Field]
 playFieldMoves = foldl $ \fields (pos, player) -> putPoint pos player (head fields) : fields
 
+beginPatternMoves :: BeginPattern -> Player -> Int -> Int -> [(Pos, Player)]
+beginPatternMoves Empty = const $ const $ const []
+beginPatternMoves Cross = crossMoves
+beginPatternMoves TwoCrosses = twoCrossesMoves
+
 beginPatternFields :: BeginPattern -> Player -> Int -> Int -> [Field]
-beginPatternFields Empty _ width height = [emptyField width height]
-beginPatternFields Cross player width height = playFieldMoves [emptyField width height] $ crossMoves width height player
+beginPatternFields beginPattern player width height =
+  playFieldMoves [emptyField width height] $ beginPatternMoves beginPattern player width height
 
 beginPatternGameTree :: BeginPattern -> Int -> Int -> GameTree
 beginPatternGameTree beginPattern width height =

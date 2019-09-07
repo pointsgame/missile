@@ -28,6 +28,21 @@ data Game = Game { gGameTree :: IORef GameTree
                  , gCallback :: IO ()
                  }
 
+data BotException e = BotExceptionRed e | BotExceptionBlack e
+
+instance Show e => Show (BotException e) where
+  show (BotExceptionRed exception) = "Red bot error: " ++ show exception
+  show (BotExceptionBlack exception) = "Black bot error: " ++ show exception
+
+instance Exception e => Exception (BotException e)
+
+withBotError :: Player -> Async a -> Async a
+withBotError Red = flip catchE $ err . SomeException . BotExceptionRed
+withBotError Black = flip catchE $ err . SomeException . BotExceptionBlack
+
+asyncBot :: Player -> IO a -> Async a
+asyncBot player = withBotError player . async
+
 gameGameTree :: Game -> IO GameTree
 gameGameTree = readIORef . gGameTree
 
@@ -44,17 +59,17 @@ gameBot :: Game -> Player -> IO (Maybe Bot)
 gameBot game = readIORef . gameBotIORef game
 
 genMoveByType :: GenMoveType -> Bot -> Player -> Async Pos
-genMoveByType Simple bot player = async $ genMove bot player
-genMoveByType (WithTime time) bot player = async $ genMoveWithTime bot player time
-genMoveByType (WithComplexity complexity) bot player = async $ genMoveWithComplexity bot player complexity
+genMoveByType Simple bot player = asyncBot player $ genMove bot player
+genMoveByType (WithTime time) bot player = asyncBot player $ genMoveWithTime bot player time
+genMoveByType (WithComplexity complexity) bot player = asyncBot player $ genMoveWithComplexity bot player complexity
 
 gameBotsPutPoint :: Game -> Pos -> Player -> Async ()
 gameBotsPutPoint game pos player = do
   maybeRedBot <- now $ readIORef $ gRedBot game
   maybeBlackBot <- now $ readIORef $ gBlackBot game
   let continue = now $ return ()
-      c1 = maybe continue (\bot -> async $ play bot pos player) maybeRedBot
-      c2 = maybe continue (\bot -> async $ play bot pos player) maybeBlackBot
+      c1 = maybe continue (\bot -> asyncBot Red $ play bot pos player) maybeRedBot
+      c2 = maybe continue (\bot -> asyncBot Black $ play bot pos player) maybeBlackBot
   void $ concurrently c1 c2
 
 gamePlayLoop :: Game -> Async ()
@@ -101,17 +116,17 @@ stopBot botIORef delay = do
 
 stopBots :: Game -> Int -> Async ()
 stopBots game delay = do
-  let c1 = stopBot (gRedBot game) delay
-      c2 = stopBot (gBlackBot game) delay
+  let c1 = withBotError Red $ stopBot (gRedBot game) delay
+      c2 = withBotError Black $ stopBot (gBlackBot game) delay
   void $ concurrently c1 c2
 
 initBots :: Game -> Async ()
 initBots game = do
   gameSettings <- now $ readIORef $ gGameSettings game
   gameTree <- now $ readIORef $ gGameTree game
-  let c1 = do maybeRedBot <- forM (gsRedBotPath gameSettings) $ initBot gameTree
+  let c1 = do maybeRedBot <- forM (gsRedBotPath gameSettings) $ withBotError Red . initBot gameTree
               now $ writeIORef (gRedBot game) maybeRedBot
-      c2 = do maybeBlackBot <- forM (gsBlackBotPath gameSettings) $ initBot gameTree
+      c2 = do maybeBlackBot <- forM (gsBlackBotPath gameSettings) $ withBotError Black . initBot gameTree
               now $ writeIORef (gBlackBot game) maybeBlackBot
   void $ concurrently c1 c2
 

@@ -469,7 +469,7 @@ main = do
   let callbackError exception = postGUIASync $ do -- todo kill bots?
         messageDialog <- new Gtk.MessageDialog [ #buttons := Gtk.ButtonsTypeOk
                                                , #messageType := Gtk.MessageTypeError
-                                               , #text := pack $ "Bot made a mistake: " ++ show exception
+                                               , #text := pack $ show exception
                                                , #transientFor := mwWindow mainWindow
                                                ]
         _ <- #run messageDialog

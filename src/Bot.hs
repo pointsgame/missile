@@ -75,7 +75,7 @@ stop bot delay =
   do answerEither <- try (quit bot delay) :: IO (Either SomeException ())
      case answerEither of
        Left _  -> terminateProcess (processId bot)
-       Right _ ->
+       Right _ -> void $ forkIO $
          do threadDelay delay
             maybeExitCode <- getProcessExitCode (processId bot)
             case maybeExitCode of

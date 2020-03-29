@@ -11,17 +11,17 @@ import Field
 constructField :: String -> Field
 constructField image =
   let width = length $ takeWhile (/= ' ') $ dropWhile (== ' ') image
-      lines = chunksOf width $ filter (/= ' ') image
-      assertion = Exception.assert $ all (\line -> length line == width) lines
-      height = length lines
-      moves = map (\(x, y, char) -> ((x, y), if isLower char then Red else Black)) $
-                sortOn (\(_, _, char) -> (toLower char, isLower char))
-                [ (x, y, char)
-                | (y, line) <- zip [0 ..] lines
-                , (x, char) <- zip [0 ..] line
-                , toLower char /= toUpper char
-                ]
-  in assertion $ foldl (\field (pos, player) -> putPoint pos player field) (emptyField width height) moves
+      lines' = chunksOf width $ filter (/= ' ') image
+      assertion = Exception.assert $ all (\line -> length line == width) lines'
+      height = length lines'
+      moves' = map (\(x, y, char) -> ((x, y), if isLower char then Red else Black)) $
+                 sortOn (\(_, _, char) -> (toLower char, isLower char))
+                 [ (x, y, char)
+                 | (y, line) <- zip [0 ..] lines'
+                 , (x, char) <- zip [0 ..] line
+                 , toLower char /= toUpper char
+                 ]
+  in assertion $ foldl (\field (pos, player) -> putPoint pos player field) (emptyField width height) moves'
 
 simpleSurround :: Assertion
 simpleSurround =

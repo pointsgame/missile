@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiWayIf #-}
+
 module Field ( Pos
              , n
              , s
@@ -25,10 +27,29 @@ import Data.Array
 import Data.List
 import Data.Maybe
 import qualified Data.Set as S
-import Auxiliary
 import Player
 
 type Pos = (Int, Int)
+
+fst'' :: (a1, a2, a3, a4) -> a1
+fst'' (a, _, _, _) = a
+snd'' :: (a1, a2, a3, a4) -> a2
+snd'' (_, a, _, _) = a
+thd'' :: (a1, a2, a3, a4) -> a3
+thd'' (_, _, a, _) = a
+fth'' :: (a1, a2, a3, a4) -> a4
+fth'' (_, _, _, a) = a
+
+count :: (a -> Bool) -> [a] -> Int
+count _ [] = 0
+count p (x : xs) | p x       = 1 + count p xs
+                 | otherwise = count p xs
+
+removeNearSame :: Eq a => [a] -> [a]
+removeNearSame [] = []
+removeNearSame [a] = [a]
+removeNearSame (h : t) | h == head t = removeNearSame t
+                       | otherwise   = h : removeNearSame t
 
 n :: Pos -> Pos
 n (x, y) = (x, y + 1)

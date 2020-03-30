@@ -41,15 +41,10 @@ fth'' :: (a1, a2, a3, a4) -> a4
 fth'' (_, _, _, a) = a
 
 count :: (a -> Bool) -> [a] -> Int
-count _ [] = 0
-count p (x : xs) | p x       = 1 + count p xs
-                 | otherwise = count p xs
+count f = length . filter f
 
-removeNearSame :: Eq a => [a] -> [a]
-removeNearSame [] = []
-removeNearSame [a] = [a]
-removeNearSame (h : t) | h == head t = removeNearSame t
-                       | otherwise   = h : removeNearSame t
+uniq :: Eq a => [a] -> [a]
+uniq = map head . group
 
 n :: Pos -> Pos
 n (x, y) = (x, y + 1)
@@ -64,16 +59,16 @@ e :: Pos -> Pos
 e (x, y) = (x + 1, y)
 
 nw :: Pos -> Pos
-nw (x, y) = (x - 1, y + 1)
+nw = n . w
 
 ne :: Pos -> Pos
-ne (x, y) = (x + 1, y + 1)
+ne = n . e
 
 sw :: Pos -> Pos
-sw (x, y) = (x - 1, y - 1)
+sw = s . w
 
 se :: Pos -> Pos
-se (x, y) = (x + 1, y - 1)
+se = s . e
 
 data Point = EmptyPoint |
              PlayerPoint Player |
@@ -228,7 +223,7 @@ getInputPoints field pos player =
 
 posInsideRing :: Pos -> [Pos] -> Bool
 posInsideRing (x, y) ring =
-  let ring' = removeNearSame $ map snd $ filter ((<= x) . fst) ring
+  let ring' = uniq $ map snd $ filter ((<= x) . fst) ring
       ring'' | last ring' == y = ring' ++ [head $ if head ring' == y then tail ring' else ring']
              | head ring' == y = last ring' : ring'
              | otherwise       = ring'

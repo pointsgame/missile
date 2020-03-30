@@ -56,6 +56,10 @@ executable missile
                       gi-gdkpixbuf,
                       gi-gtk,
                       gi-gtk-hs,
+
+                      gi-gtk-declarative,
+                      gi-gtk-declarative-app-simple,
+
                       split,
                       text,
                       transformers,

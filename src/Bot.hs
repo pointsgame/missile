@@ -13,7 +13,6 @@ module Bot ( Bot
            , undo
            ) where
 
-import GHC.IO.Handle
 import System.IO
 import System.Process
 import System.Timeout
@@ -26,7 +25,6 @@ import Field
 
 data Bot = Bot { stdInput :: Handle
                , stdOutput :: Handle
-               , stdError :: Handle
                , processId :: ProcessHandle
                }
 
@@ -57,10 +55,9 @@ run path =
   do (inp, out, err, pid) <- runInteractiveProcess path [] Nothing Nothing
      hSetBuffering inp NoBuffering
      hSetBuffering out NoBuffering
-     hSetBuffering err NoBuffering
+     hClose err
      return Bot { stdInput = inp
                 , stdOutput = out
-                , stdError = err
                 , processId = pid
                 }
 
